@@ -5,8 +5,9 @@ import VesperCore
 
 /// Drives the Meta Ray-Ban Display's in-lens screen (600×600).
 ///
-/// Each `send` replaces the whole layout and travels over Bluetooth, so we only send when
-/// the content changes (armed, lap completed, mission over), never on a timer.
+/// Each `send` replaces the whole layout and travels over Bluetooth, so live gauges are
+/// rounded, de-duplicated and capped at a few refreshes a second. Lap cards hold the
+/// screen for a few seconds before the live gauges come back.
 /// SwiftUI is intentionally not imported: MWDATDisplay has its own `Text`.
 @MainActor
 final class LensDisplay {
@@ -16,6 +17,10 @@ final class LensDisplay {
     private var shown: LensHUD?
     private var latest: LensHUD?
     private var revertTask: Task<Void, Never>?
+    private var holdUntil = Date.distantPast
+    private var lastSend = Date.distantPast
+    /// Minimum gap between live refreshes.
+    private let liveInterval: TimeInterval = 0.4
 
     func attach(to session: DeviceSession) {
         guard display == nil else { return }
@@ -35,13 +40,23 @@ final class LensDisplay {
         }
     }
 
-    /// Show `hud`; if `revertTo` is given, switch to it after `seconds`.
-    func show(_ hud: LensHUD, revertTo: LensHUD? = nil, after seconds: Double = 8) {
+    /// Live speed and revs. Dropped while a lap card is up or if the last refresh was too recent;
+    /// the next reading catches up, so nothing stale lingers.
+    func live(_ hud: LensHUD) {
+        let now = Date()
+        guard now >= holdUntil, now.timeIntervalSince(lastSend) >= liveInterval else { return }
+        lastSend = now
+        Task { await send(hud) }
+    }
+
+    /// Show a card (lap complete, armed, finished). With `hold`, live updates pause that long.
+    func show(_ hud: LensHUD, hold seconds: Double = 0, revertTo: LensHUD? = nil) {
         revertTask?.cancel()
+        holdUntil = Date().addingTimeInterval(seconds)
         Task { await send(hud) }
         guard let revertTo else { return }
         revertTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
+            try? await Task.sleep(for: .seconds(max(seconds, 1)))
             guard !Task.isCancelled else { return }
             await self?.send(revertTo)
         }

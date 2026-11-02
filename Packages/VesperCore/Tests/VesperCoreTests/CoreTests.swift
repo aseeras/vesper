@@ -104,4 +104,16 @@ final class LensHUDTests: XCTestCase {
         XCTAssertEqual(slower.detail, "+1.00 TO BEST")
         XCTAssertFalse(slower.positive)
     }
+
+    func testLiveGaugesRoundSoTheLensRefreshesSparingly() {
+        let a = LensHUD.live(speed: 50, rpm: 5_812, unit: .mph, lap: 3, best: Lap(number: 2, start: 0, end: 102.381, topSpeed: 60))
+        XCTAssertEqual(a.headline, "112 MPH")
+        XCTAssertEqual(a.footnote, "LAP 3 · BEST 1:42.381")
+        XCTAssertTrue(a.detail?.hasSuffix("RPM") ?? false)
+        XCTAssertTrue(a.detail?.contains("800") ?? false)
+        // A wobble of a few rpm and a fraction of a mph produces the identical layout.
+        let b = LensHUD.live(speed: 50.05, rpm: 5_790, unit: .mph, lap: 3, best: Lap(number: 2, start: 0, end: 102.381, topSpeed: 60))
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(LensHUD.live(speed: 0, rpm: nil, unit: .kmh, lap: 0, best: nil).detail, "— RPM")
+    }
 }

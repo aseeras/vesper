@@ -1,7 +1,7 @@
 import Foundation
 
-/// What the Ray-Ban Display lens shows while driving. Deliberately three lines at most,
-/// changed only when something happens, so it's a glance and never a screen to read.
+/// What the Ray-Ban Display lens shows while driving: three short lines, read at a glance.
+/// Live speed and revs between laps; the lap time flashes up when you cross the line.
 public struct LensHUD: Equatable, Sendable {
     public var headline: String
     public var detail: String?
@@ -27,6 +27,16 @@ public struct LensHUD: Equatable, Sendable {
         }
         return LensHUD(headline: "L\(lap.number)  \(Format.lapTime(lap.duration))", detail: detail,
                        footnote: "TOP \(Format.speed(lap.topSpeed, unit))", positive: positive)
+    }
+
+    /// Live gauges: big speed, revs underneath, lap and best at the bottom.
+    /// Values are rounded (1 mph, 100 rpm) so the lens only refreshes when a reading really moves.
+    public static func live(speed: Double, rpm: Double?, unit: SpeedUnit, lap: Int, best: Lap?) -> LensHUD {
+        let shownSpeed = Int(unit.convert(max(0, speed)).rounded())
+        let revs = rpm.map { "\((Int(($0 / 100).rounded()) * 100).formatted(.number.grouping(.automatic))) RPM" } ?? "— RPM"
+        var foot = lap > 0 ? "LAP \(lap)" : "OUT LAP"
+        if let best { foot += " · BEST \(Format.lapTime(best.duration))" }
+        return LensHUD(headline: "\(shownSpeed) \(unit.label)", detail: revs, footnote: foot)
     }
 
     /// Resting state between laps: lap number and the best so far. No running clock to stare at.

@@ -66,7 +66,7 @@ final class MissionController {
 
         do { try EngineAudio.configureSession() } catch { self.error = "Audio: \(error.localizedDescription)" }
         let audio = EngineAudio(cylinders: settings.cylinders)
-        audio.onRPM = { [weak self] in self?.rpm = $0 }
+        audio.onRPM = { [weak self] in self?.rpm = $0; self?.refreshLens() }
         do { try audio.startMonitoring(missionStartUptime: startUptime) } catch { self.error = "Microphone unavailable" }
         engineAudio = audio
 
@@ -114,8 +114,16 @@ final class MissionController {
 
     func reset() { phase = .idle }
 
+    /// Live speed and revs on the Ray-Ban Display lens once the car is rolling.
+    private func refreshLens() {
+        guard phase == .rolling else { return }
+        glasses.lens.live(.live(speed: speed, rpm: rpm, unit: settings.unit,
+                                lap: lapCount > 0 ? lapCount + 1 : 0, best: bestLap))
+    }
+
     private func handle(_ fix: GPSFix) {
         speed = max(0, fix.speed)
+        refreshLens()
         if let e = auto.update(speed: speed, at: fix.t) { react(to: e) }
         guard phase == .rolling else { return }
         fixesSinceRolling.append(fix)
@@ -140,8 +148,7 @@ final class MissionController {
         lapCount = lap.number
         currentLapStart = lap.end
         let isBest = best?.number == lap.number && lap.number > 1
-        glasses.lens.show(.lapComplete(lap, previousBest: bestLap, unit: settings.unit),
-                          revertTo: .onLap(lap.number + 1, best: best))
+        glasses.lens.show(.lapComplete(lap, previousBest: bestLap, unit: settings.unit), hold: 6)
         bestLap = best
         var line = "Lap \(lap.number). \(Format.spokenLapTime(lap.duration))."
         if isBest { line += " Fastest lap." }
@@ -157,7 +164,6 @@ final class MissionController {
             glasses.setPreview(enabled: false)
             try? engineAudio?.startRecording(to: MissionStore.audioURL(mission.id))
             phase = .rolling
-            glasses.lens.show(.onLap(0, best: nil))
             announcer.say("Rolling. Good hunting.")
         case .finishMission:
             Task { await finish() }

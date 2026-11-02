@@ -8,7 +8,7 @@ It's built to be hands-free. You arm it in the paddock, and from then on you nev
 
 - **Recording starts and stops by itself.** Filming begins once you hold speed and ends after you've been parked for 45 seconds.
 - **The glasses talk to you.** A British voice calls out each lap time and your fastest laps through the glasses' speakers.
-- **The lens shows only what you need.** On Meta Ray-Ban Display glasses, the in-lens screen shows your lap number, last lap time, gap to your best lap and top speed. It changes only when you cross the line, never as a running clock.
+- **Speed and revs in your eye-line.** On Meta Ray-Ban Display glasses, the in-lens screen shows live speed and RPM, with your lap and best lap underneath. When you cross the line, your lap time and gap to your best flash up for six seconds.
 - **CarPlay.** The car's screen shows status and lap times, with Arm and End buttons that only work while you're stopped.
 - **The phone can stay in your pocket.** The glasses stream compressed video that keeps recording with the phone locked.
 
