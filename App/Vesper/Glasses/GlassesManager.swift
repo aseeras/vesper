@@ -141,6 +141,9 @@ final class GlassesManager {
 
     private func sessionStarted(_ session: DeviceSession) {
         guard camera == nil else { return }
+        // The lens doesn't depend on the camera, so bring it up first: a camera problem
+        // must not leave the driver without speed and revs.
+        if wantsLens { lens.attach(to: session) }
         let config = StreamConfiguration(videoCodec: VideoCodec.hvc1, resolution: StreamingResolution.high, frameRate: 30)
         do {
             guard let camera = try session.addCamera(config: config) else { link = .failed("Camera unavailable"); return }
@@ -170,7 +173,6 @@ final class GlassesManager {
         } catch {
             link = .failed("Camera: \(error.localizedDescription)")
         }
-        if wantsLens { lens.attach(to: session) }
     }
 
     nonisolated private static func enqueuePreview(_ sample: CMSampleBuffer, on layer: AVSampleBufferDisplayLayer) {

@@ -91,7 +91,8 @@ final class MissionController {
         }
         glasses.setPreview(enabled: true)
         await glasses.start(lensDisplay: settings.lensDisplay)
-        glasses.lens.show(.armed())
+        // Brief "armed" card, then live speed and revs straight away, even parked.
+        glasses.lens.show(.armed(), hold: 3)
 
         clock = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -121,9 +122,9 @@ final class MissionController {
 
     func reset() { phase = .idle }
 
-    /// Live speed and revs on the Ray-Ban Display lens once the car is rolling.
+    /// Live speed and revs on the Ray-Ban Display lens from the moment the mission is armed.
     private func refreshLens() {
-        guard phase == .rolling else { return }
+        guard phase == .armed || phase == .rolling else { return }
         if mode == .road {
             glasses.lens.live(.liveRoad(speed: speed, rpm: rpm, unit: settings.unit, distance: tripDistance,
                                         elapsed: missionTime - (rollingSince ?? missionTime)))

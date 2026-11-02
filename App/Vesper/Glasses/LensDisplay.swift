@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import MWDATCore
 import MWDATDisplay
 import VesperCore
@@ -10,20 +11,25 @@ import VesperCore
 /// screen for a few seconds before the live gauges come back.
 /// SwiftUI is intentionally not imported: MWDATDisplay has its own `Text`.
 @MainActor
+@Observable
 final class LensDisplay {
-    private var display: Display?
-    private var token: AnyListenerToken?
-    private var ready = false
-    private var shown: LensHUD?
-    private var latest: LensHUD?
-    private var revertTask: Task<Void, Never>?
-    private var holdUntil = Date.distantPast
-    private var lastSend = Date.distantPast
+    /// Shown on the phone so a blank lens can be explained at a glance.
+    private(set) var status = "Lens off"
+
+    @ObservationIgnored private var display: Display?
+    @ObservationIgnored private var token: AnyListenerToken?
+    @ObservationIgnored private var ready = false
+    @ObservationIgnored private var shown: LensHUD?
+    @ObservationIgnored private var latest: LensHUD?
+    @ObservationIgnored private var revertTask: Task<Void, Never>?
+    @ObservationIgnored private var holdUntil = Date.distantPast
+    @ObservationIgnored private var lastSend = Date.distantPast
     /// Minimum gap between live refreshes.
     private let liveInterval: TimeInterval = 0.4
 
     func attach(to session: DeviceSession) {
         guard display == nil else { return }
+        status = "Lens connecting…"
         do {
             let display = try session.addDisplay()
             self.display = display
@@ -31,12 +37,14 @@ final class LensDisplay {
                 Task { @MainActor in
                     guard let self else { return }
                     if case .started = state { self.ready = true } else { self.ready = false }
+                    self.status = self.ready ? "Lens live" : "Lens: \(state)"
                     if self.ready, let latest = self.latest { await self.send(latest) }
                 }
             }
             display.start()
         } catch {
             print("Lens display unavailable: \(error)")
+            status = "Lens unavailable: \(error.localizedDescription)"
         }
     }
 
@@ -70,6 +78,7 @@ final class LensDisplay {
         ready = false
         shown = nil
         latest = nil
+        status = "Lens off"
     }
 
     private func send(_ hud: LensHUD) async {
@@ -86,6 +95,7 @@ final class LensDisplay {
             shown = hud
         } catch {
             print("Lens display send failed: \(error)")
+            status = "Lens send failed: \(error.localizedDescription)"
         }
     }
 }
