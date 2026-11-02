@@ -20,6 +20,11 @@ final class AppModel {
     /// Set when a mission finishes so the phone can jump to its debrief.
     var finishedMissionID: UUID?
 
+    init() {
+        let settings = self.settings
+        glasses.lensEnabled = { settings.lensDisplay }
+    }
+
     func arm(trackName: String, mode: DriveMode) async {
         guard activeMission == nil else { return }
         settings.lastMode = mode

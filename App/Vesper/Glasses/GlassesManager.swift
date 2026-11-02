@@ -48,6 +48,11 @@ final class GlassesManager {
     @ObservationIgnored private let streamTokens = ListenerTokenBag()
     @ObservationIgnored private var sessionTask: Task<Void, Never>?
     @ObservationIgnored private var wantsLens = false
+    @ObservationIgnored private var wantsCamera = false
+    @ObservationIgnored private var sessionIsStarted = false
+    @ObservationIgnored private var errorTask: Task<Void, Never>?
+    /// Whether to light up the lens (racetrack welcome, live gauges). Set by AppModel from settings.
+    @ObservationIgnored var lensEnabled: () -> Bool = { true }
     @ObservationIgnored nonisolated(unsafe) private var previewEnabled = true
 
     private static var configured = false
@@ -72,6 +77,7 @@ final class GlassesManager {
         for await devices in wearables.devicesStream() {
             hasDevice = !devices.isEmpty
             if isRegistered, session == nil { link = hasDevice ? .ready : .waitingForGlasses }
+            showWelcomeIfPossible()
         }
     }
 
@@ -80,6 +86,7 @@ final class GlassesManager {
         case .registered:
             isRegistered = true
             if session == nil { link = hasDevice ? .ready : .waitingForGlasses }
+            showWelcomeIfPossible()
         case .registering:
             link = .registering
         default:
@@ -107,10 +114,19 @@ final class GlassesManager {
         if !enabled { previewLayer.sampleBufferRenderer.flush(removingDisplayedImage: true, completionHandler: nil) }
     }
 
-    /// Opens a session, then starts the camera (720×1280 @ 30 fps, HEVC) and, on
-    /// Ray-Ban Display glasses, the lens display.
+    /// As soon as the app is open and paired Ray-Ban Display glasses are on, put the
+    /// racetrack welcome on the lens. The session stays open, and arming a drive adds the
+    /// camera to it.
+    private func showWelcomeIfPossible() {
+        guard isRegistered, hasDevice, session == nil, lensEnabled() else { return }
+        wantsLens = true
+        lens.showWelcome()
+        openSession(displayOnly: true)
+    }
+
+    /// Starts the camera (720×1280 @ 30 fps, HEVC) and, on Ray-Ban Display glasses, the lens
+    /// display. Reuses the welcome session when it is already open.
     func start(lensDisplay: Bool) async {
-        guard session == nil else { return }
         wantsLens = lensDisplay
         do {
             if try await wearables.checkPermissionStatus(.camera) != .granted {
@@ -118,7 +134,24 @@ final class GlassesManager {
                     link = .failed("Camera permission denied in Meta AI"); return
                 }
             }
-            let session = try wearables.createSession(deviceSelector: AutoDeviceSelector(wearables: wearables))
+        } catch {
+            link = .failed("Glasses: \(error.localizedDescription)"); return
+        }
+        wantsCamera = true
+        if let session {
+            // Welcome session already open: add the camera now, or when it finishes starting.
+            if sessionIsStarted { sessionStarted(session) }
+            return
+        }
+        openSession(displayOnly: false)
+    }
+
+    private func openSession(displayOnly: Bool) {
+        do {
+            let selector = displayOnly
+                ? AutoDeviceSelector(wearables: wearables, filter: { device in device.supportsDisplay() })
+                : AutoDeviceSelector(wearables: wearables)
+            let session = try wearables.createSession(deviceSelector: selector)
             self.session = session
             link = .connecting
             let states = session.stateStream()
@@ -132,6 +165,15 @@ final class GlassesManager {
                     }
                 }
             }
+            let errors = session.errorStream()
+            errorTask = Task { [weak self] in
+                for await error in errors {
+                    print("Glasses session error: \(error)")
+                    if error == .datAppOnTheGlassesUpdateRequired {
+                        self?.link = .failed("Update Vesper on the glasses in the Meta AI app")
+                    }
+                }
+            }
             try session.start()
         } catch {
             link = .failed("Glasses: \(error.localizedDescription)")
@@ -140,10 +182,12 @@ final class GlassesManager {
     }
 
     private func sessionStarted(_ session: DeviceSession) {
-        guard camera == nil else { return }
+        sessionIsStarted = true
         // The lens doesn't depend on the camera, so bring it up first: a camera problem
         // must not leave the driver without speed and revs.
         if wantsLens { lens.attach(to: session) }
+        if !wantsCamera { link = .ready }
+        guard wantsCamera, camera == nil else { return }
         let config = StreamConfiguration(videoCodec: VideoCodec.hvc1, resolution: StreamingResolution.high, frameRate: 30)
         do {
             guard let camera = try session.addCamera(config: config) else { link = .failed("Camera unavailable"); return }
@@ -196,6 +240,11 @@ final class GlassesManager {
         streamTokens.clear()
         sessionTask?.cancel()
         sessionTask = nil
+        errorTask?.cancel()
+        errorTask = nil
+        lens.detach()
+        sessionIsStarted = false
+        wantsCamera = false
         camera = nil
         session = nil
         if isRegistered { link = hasDevice ? .ready : .waitingForGlasses }
