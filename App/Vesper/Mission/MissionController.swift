@@ -23,6 +23,11 @@ final class MissionController {
     private(set) var lapCount = 0
     private(set) var missionTime: Double = 0
     private(set) var error: String?
+    private(set) var mode: DriveMode = .track
+    /// Grand tour trip meter, metres.
+    private(set) var tripDistance: Double = 0
+    private(set) var rollingSince: Double?
+    private var lastFix: GPSFix?
 
     let glasses: GlassesManager
     private let store: MissionStore
@@ -52,14 +57,16 @@ final class MissionController {
     /// Safety interlock: the screen only accepts input when the car is (nearly) stopped.
     var isStationary: Bool { speed < 10 / 3.6 }
 
-    func arm(trackName: String, gate: Gate?) async {
+    func arm(trackName: String, mode: DriveMode, gate: Gate?) async {
         guard phase == .idle else { return }
         error = nil
+        self.mode = mode
+        tripDistance = 0; rollingSince = nil; lastFix = nil
         announcer.enabled = settings.voiceCallouts
         startUptime = ProcessInfo.processInfo.systemUptime
-        mission = Mission(codename: Format.codename(for: .now), trackName: trackName.isEmpty ? "Unnamed circuit" : trackName,
-                          car: settings.car, date: .now, unit: settings.unit, gate: gate)
-        auto = AutoRecordController(policy: settings.policy)
+        mission = Mission(codename: Format.codename(for: .now), trackName: trackName.isEmpty ? (mode == .road ? "Open road" : "Unnamed circuit") : trackName,
+                          car: settings.car, driveMode: mode, date: .now, unit: settings.unit, gate: gate)
+        auto = AutoRecordController(policy: settings.policy(for: mode))
         lapTimer = gate.map { LiveLapTimer(gate: $0) }
         lapCount = 0; lastLap = nil; bestLap = nil; currentLapStart = nil; fixesSinceRolling = []
         UIApplication.shared.isIdleTimerDisabled = true
@@ -93,7 +100,7 @@ final class MissionController {
             }
         }
         phase = .armed
-        announcer.say("Vesper armed. Recording begins when you do.")
+        announcer.say(mode == .road ? "Vesper armed. Enjoy the drive." : "Vesper armed. Recording begins when you do.")
     }
 
     /// Driver pressed the big button in the paddock.
@@ -117,8 +124,13 @@ final class MissionController {
     /// Live speed and revs on the Ray-Ban Display lens once the car is rolling.
     private func refreshLens() {
         guard phase == .rolling else { return }
-        glasses.lens.live(.live(speed: speed, rpm: rpm, unit: settings.unit,
-                                lap: lapCount > 0 ? lapCount + 1 : 0, best: bestLap))
+        if mode == .road {
+            glasses.lens.live(.liveRoad(speed: speed, rpm: rpm, unit: settings.unit, distance: tripDistance,
+                                        elapsed: missionTime - (rollingSince ?? missionTime)))
+        } else {
+            glasses.lens.live(.live(speed: speed, rpm: rpm, unit: settings.unit,
+                                    lap: lapCount > 0 ? lapCount + 1 : 0, best: bestLap))
+        }
     }
 
     private func handle(_ fix: GPSFix) {
@@ -126,6 +138,13 @@ final class MissionController {
         refreshLens()
         if let e = auto.update(speed: speed, at: fix.t) { react(to: e) }
         guard phase == .rolling else { return }
+        if rollingSince == nil { rollingSince = fix.t }
+        if let prev = lastFix, fix.accuracy < 30 {
+            tripDistance += LocalProjection(origin: prev.point).project(fix.point).length
+        }
+        lastFix = fix
+        // Grand tours have no laps.
+        guard mode == .track else { return }
         fixesSinceRolling.append(fix)
 
         // No start line set: work one out once we've seen enough of the circuit.
@@ -164,7 +183,7 @@ final class MissionController {
             glasses.setPreview(enabled: false)
             try? engineAudio?.startRecording(to: MissionStore.audioURL(mission.id))
             phase = .rolling
-            announcer.say("Rolling. Good hunting.")
+            announcer.say(mode == .road ? "Rolling. Enjoy the drive." : "Rolling. Good hunting.")
         case .finishMission:
             Task { await finish() }
         }
@@ -189,12 +208,16 @@ final class MissionController {
         mission.videoStart = videoUptime.map { $0 - startUptime }
         mission.hasEngineAudio = audioUptime != nil
         mission.audioStart = audioUptime.map { $0 - startUptime }
-        if mission.gate == nil { mission.gate = LapDetector.autoGate(for: track.fixes) }
-        if let gate = mission.gate { mission.laps = LapDetector.laps(gate: gate, fixes: track.fixes) }
+        if mode == .track {
+            if mission.gate == nil { mission.gate = LapDetector.autoGate(for: track.fixes) }
+            if let gate = mission.gate { mission.laps = LapDetector.laps(gate: gate, fixes: track.fixes) }
+        }
         store.save(mission, telemetry: track)
         self.mission = nil
         phase = .done(mission.id)
-        announcer.say("Mission complete. Your debrief is ready.")
+        announcer.say(mode == .road
+                      ? "Drive complete. \(Format.distance(track.distance, settings.unit).lowercased().replacingOccurrences(of: " mi", with: " miles").replacingOccurrences(of: " km", with: " kilometres")). Your film is ready to cut."
+                      : "Mission complete. Your debrief is ready.")
     }
 }
 

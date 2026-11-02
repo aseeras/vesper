@@ -7,6 +7,8 @@ struct Mission: Codable, Identifiable, Hashable {
     var codename: String
     var trackName: String
     var car: String
+    /// Track day or grand tour. Optional so missions saved before modes existed still load.
+    var driveMode: DriveMode?
     var date: Date
     var unit: SpeedUnit
     /// Mission time (seconds) of the first video frame and first audio sample.
@@ -19,6 +21,7 @@ struct Mission: Codable, Identifiable, Hashable {
     var hasFilm = false
 
     var bestLap: Lap? { laps.min { $0.duration < $1.duration } }
+    var mode: DriveMode { driveMode ?? .track }
 }
 
 @MainActor

@@ -50,6 +50,14 @@ public struct TelemetryTrack: Codable, Sendable {
         max(fixes.last?.t ?? 0, gforces.last?.t ?? 0, rpm.last?.t ?? 0)
     }
 
+    /// Distance driven in metres.
+    public var distance: Double {
+        zip(fixes, fixes.dropFirst()).reduce(0) { total, pair in
+            let p = LocalProjection(origin: pair.0.point)
+            return total + p.project(pair.1.point).length
+        }
+    }
+
     public var maxSpeed: Double { fixes.map(\.speed).max() ?? 0 }
     public var peakLateralG: Double { gforces.map { abs($0.lateral) }.max() ?? 0 }
     public var peakBrakingG: Double { gforces.map { -$0.longitudinal }.max() ?? 0 }

@@ -22,6 +22,9 @@ final class DriverSettings {
     var filmLength: Double { didSet { d.set(filmLength, forKey: "filmLength") } }
     /// Show lap info on the Ray-Ban Display's in-lens screen.
     var lensDisplay: Bool { didSet { d.set(lensDisplay, forKey: "lensDisplay") } }
+    var lastMode: DriveMode { didSet { d.set(lastMode.rawValue, forKey: "lastMode") } }
+    /// Grand tour films can leave the speedometer out.
+    var showSpeedOnRoad: Bool { didSet { d.set(showSpeedOnRoad, forKey: "showSpeedOnRoad") } }
 
     init() {
         callsign = d.string(forKey: "callsign") ?? "ALVIN"
@@ -35,13 +38,16 @@ final class DriverSettings {
         glassesLatency = d.object(forKey: "glassesLatency") as? Double ?? 0.15
         filmLength = d.object(forKey: "filmLength") as? Double ?? 60
         lensDisplay = d.object(forKey: "lensDisplay") as? Bool ?? true
+        lastMode = DriveMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .track
+        showSpeedOnRoad = d.object(forKey: "showSpeedOnRoad") as? Bool ?? true
     }
 
     /// Auto-record thresholds in the units the driver thinks in.
-    var policy: AutoRecordPolicy {
+    func policy(for mode: DriveMode) -> AutoRecordPolicy {
         var p = AutoRecordPolicy()
         p.startSpeed = autoStartSpeed / unit.convert(1)
-        p.stopHold = autoStopMinutes * 60
+        // On the road, traffic lights and junctions shouldn't end the drive: wait at least 5 minutes.
+        p.stopHold = mode == .road ? max(300, autoStopMinutes * 60) : autoStopMinutes * 60
         return p
     }
 }

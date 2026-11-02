@@ -56,16 +56,27 @@ struct MissionView: View {
                 Circle().fill(Theme.signalRed).frame(width: 10, height: 10)
                 Text("Rec").tracked(11, Theme.signalRed)
                 Spacer()
-                Text(controller.lapCount > 0 ? "Lap \(controller.lapCount + 1)" : "Out lap").tracked(11, Theme.gold)
+                if controller.mode == .track {
+                    Text(controller.lapCount > 0 ? "Lap \(controller.lapCount + 1)" : "Out lap").tracked(11, Theme.gold)
+                } else {
+                    Text("Grand tour").tracked(11, Theme.gold)
+                }
             }
             Spacer()
-            TimelineView(.periodic(from: .now, by: 0.1)) { _ in
-                Text(Format.lapTime(controller.currentLapStart.map { controller.missionTime - $0 } ?? controller.missionTime))
-                    .font(.system(size: 76, weight: .light, design: .monospaced))
-                    .foregroundStyle(.white).minimumScaleFactor(0.5).lineLimit(1)
-            }
-            if let best = controller.bestLap {
-                Text("Best \(Format.lapTime(best.duration))").font(Theme.mono(22)).foregroundStyle(Theme.gold)
+            if controller.mode == .track {
+                TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                    Text(Format.lapTime(controller.currentLapStart.map { controller.missionTime - $0 } ?? controller.missionTime))
+                        .font(.system(size: 76, weight: .light, design: .monospaced))
+                        .foregroundStyle(.white).minimumScaleFactor(0.5).lineLimit(1)
+                }
+                if let best = controller.bestLap {
+                    Text("Best \(Format.lapTime(best.duration))").font(Theme.mono(22)).foregroundStyle(Theme.gold)
+                }
+            } else {
+                Text(Format.distance(controller.tripDistance, settings.unit))
+                    .font(.system(size: 64, weight: .light, design: .monospaced)).foregroundStyle(.white)
+                Text(Format.duration(controller.missionTime - (controller.rollingSince ?? controller.missionTime)))
+                    .font(Theme.mono(22)).foregroundStyle(Theme.gold)
             }
             Spacer()
             Text(Format.speed(controller.speed, settings.unit)).font(Theme.mono(18)).foregroundStyle(Theme.silver)
@@ -87,7 +98,7 @@ struct MissionView: View {
 
     private func done(_ id: UUID) -> some View {
         VStack(spacing: 18) {
-            Text("Mission complete").font(Theme.title(34)).foregroundStyle(Theme.gold)
+            Text(controller.mode == .road ? "Drive complete" : "Mission complete").font(Theme.title(34)).foregroundStyle(Theme.gold)
             if let best = controller.bestLap {
                 Text("Best lap \(Format.lapTime(best.duration))").font(Theme.mono(20)).foregroundStyle(.white)
             }

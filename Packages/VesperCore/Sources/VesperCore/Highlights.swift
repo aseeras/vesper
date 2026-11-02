@@ -1,7 +1,15 @@
 import Foundation
 
+/// Track day films chase lap times and limits. Grand tour films are for spirited
+/// road drives: the best bends and pulls, plenty of scenery, and no speed bragging.
+public enum DriveMode: String, Codable, Sendable, CaseIterable {
+    case track, road
+
+    public var title: String { self == .track ? "Track day" : "Grand tour" }
+}
+
 public enum MomentKind: String, Codable, Sendable, CaseIterable {
-    case launch, corner, braking, topSpeed, fastestLap
+    case launch, corner, braking, topSpeed, fastestLap, scenery
 
     /// Seconds of footage to keep before and after the peak.
     var window: (before: Double, after: Double) {
@@ -11,6 +19,7 @@ public enum MomentKind: String, Codable, Sendable, CaseIterable {
         case .braking: return (1.0, 2.5)
         case .topSpeed: return (2.0, 1.5)
         case .fastestLap: return (2.5, 1.5)
+        case .scenery: return (2.0, 2.0)
         }
     }
 
@@ -49,6 +58,7 @@ public struct HighlightOptions: Codable, Hashable, Sendable {
     public var slowMotion = true
     public var maxSlowMotionMoments = 3
     public var unit: SpeedUnit = .mph
+    public var mode: DriveMode = .track
     /// Mission times covered by the recorded video.
     public var videoStart: Double = 0
     public var videoEnd: Double = .infinity
@@ -87,24 +97,30 @@ public struct HighlightPlan: Codable, Hashable, Sendable {
 public enum HighlightEngine {
     // MARK: Detection
 
-    public static func detectMoments(track: TelemetryTrack, laps: [Lap], unit: SpeedUnit = .mph) -> [Moment] {
+    public static func detectMoments(track: TelemetryTrack, laps: [Lap], unit: SpeedUnit = .mph,
+                                     mode: DriveMode = .track) -> [Moment] {
         var moments: [Moment] = []
         let g = track.gforces
+        let road = mode == .road
+        // Road cornering is gentler, so the bar for "a great bend" is lower.
+        let cornerMin = road ? 0.3 : 0.5, cornerFull = road ? 0.8 : 1.4
 
-        for i in peaks(g.map { abs($0.lateral) }, times: g.map(\.t), minimum: 0.5, separation: 5) {
+        for i in peaks(g.map { abs($0.lateral) }, times: g.map(\.t), minimum: cornerMin, separation: 5) {
             let v = abs(g[i].lateral)
-            moments.append(Moment(kind: .corner, t: g[i].t, score: min(1, v / 1.4), caption: "LATERAL \(Format.g(v))"))
+            moments.append(Moment(kind: .corner, t: g[i].t, score: min(1, v / cornerFull), caption: "LATERAL \(Format.g(v))"))
         }
-        for i in peaks(g.map { -$0.longitudinal }, times: g.map(\.t), minimum: 0.5, separation: 5) {
-            let v = -g[i].longitudinal
-            moments.append(Moment(kind: .braking, t: g[i].t, score: 0.9 * min(1, v / 1.2), caption: "BRAKING \(Format.g(v))"))
-        }
-        let launches = peaks(g.map { $0.longitudinal }, times: g.map(\.t), minimum: 0.3, separation: 10)
+        let launches = peaks(g.map { $0.longitudinal }, times: g.map(\.t), minimum: road ? 0.25 : 0.3, separation: 10)
             .filter { track.speed(at: g[$0].t - 1.5) < 8 }
         for i in launches {
             moments.append(Moment(kind: .launch, t: g[i].t, score: 0.7, caption: "LAUNCH \(Format.g(g[i].longitudinal))"))
         }
+        // On the road: no braking drama, no top speed, no laps.
+        if road { return moments.sorted { $0.t < $1.t } }
 
+        for i in peaks(g.map { -$0.longitudinal }, times: g.map(\.t), minimum: 0.5, separation: 5) {
+            let v = -g[i].longitudinal
+            moments.append(Moment(kind: .braking, t: g[i].t, score: 0.9 * min(1, v / 1.2), caption: "BRAKING \(Format.g(v))"))
+        }
         if let top = track.fixes.max(by: { $0.speed < $1.speed }), top.speed > 0 {
             moments.append(Moment(kind: .topSpeed, t: top.t, score: 1, caption: "V-MAX \(Format.speed(top.speed, unit))"))
         }
@@ -135,7 +151,7 @@ public enum HighlightEngine {
     public static func plan(track: TelemetryTrack, laps: [Lap], options: HighlightOptions) -> HighlightPlan {
         let videoEnd = min(options.videoEnd, max(options.videoStart, track.duration))
         let videoStart = options.videoStart
-        let moments = detectMoments(track: track, laps: laps, unit: options.unit)
+        let moments = detectMoments(track: track, laps: laps, unit: options.unit, mode: options.mode)
             .filter { $0.t >= videoStart && $0.t <= videoEnd }
         let beat = options.beat
         let budget = max(beat * 4, options.targetDuration - options.introDuration - options.outroDuration)
@@ -160,15 +176,27 @@ public enum HighlightEngine {
             if slow { slowCount += 1 }
         }
 
-        // Nothing dramatic happened: sample the drive evenly instead.
-        if picks.isEmpty, videoEnd - videoStart > 2 {
+        // Fill the rest with evenly spaced scenery: always on a grand tour, and on track
+        // only when nothing dramatic happened.
+        if (options.mode == .road || picks.isEmpty), videoEnd - videoStart > 2 {
             let clip = beat * 8
-            let count = max(1, min(Int(budget / clip), Int((videoEnd - videoStart) / clip)))
-            let gap = (videoEnd - videoStart - clip * Double(count)) / Double(count + 1)
-            for k in 0..<count {
-                let s = videoStart + gap + Double(k) * (clip + gap)
-                let m = Moment(kind: .corner, t: s + clip / 2, score: 0, caption: "")
-                picks.append(Pick(moment: m, start: s, end: min(videoEnd, s + clip), slow: false))
+            let slots = max(1, Int((videoEnd - videoStart) / clip))
+            let wanted = max(1, Int((budget - used) / clip))
+            let count = min(slots, wanted * 3)
+            let spacing = (videoEnd - videoStart) / Double(count + 1)
+            // Visit candidate spots in a golden-ratio order so the chosen ones spread over the whole drive.
+            let golden = 0.618_033_988_75
+            let order = (0..<count).sorted {
+                (Double($0) * golden).truncatingRemainder(dividingBy: 1) < (Double($1) * golden).truncatingRemainder(dividingBy: 1)
+            }
+            for k in order where used + clip <= budget {
+                let s = videoStart + spacing * Double(k + 1) - clip / 2
+                let start = max(videoStart, s), end = min(videoEnd, s + clip)
+                guard end - start >= 1 else { continue }
+                if picks.contains(where: { start < $0.end + 0.5 && end > $0.start - 0.5 }) { continue }
+                let m = Moment(kind: .scenery, t: (start + end) / 2, score: 0, caption: "")
+                picks.append(Pick(moment: m, start: start, end: end, slow: false))
+                used += end - start
             }
         }
 

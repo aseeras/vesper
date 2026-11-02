@@ -50,3 +50,12 @@ public struct LensHUD: Equatable, Sendable {
                 footnote: "Debrief ready on your phone")
     }
 }
+
+extension LensHUD {
+    /// Grand tour gauges: speed and revs, with trip distance and time underneath.
+    public static func liveRoad(speed: Double, rpm: Double?, unit: SpeedUnit, distance: Double, elapsed: Double) -> LensHUD {
+        var hud = live(speed: speed, rpm: rpm, unit: unit, lap: 0, best: nil)
+        hud.footnote = "TRIP \(Format.distance(distance, unit)) · \(Format.duration(elapsed))"
+        return hud
+    }
+}

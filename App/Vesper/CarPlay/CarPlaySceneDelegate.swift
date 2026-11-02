@@ -51,8 +51,13 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                     })
                 }
             case .rolling:
-                items.append(CPInformationItem(title: m.lapCount > 0 ? "Lap \(m.lapCount + 1)" : "Out lap",
-                                               detail: Format.speed(m.speed, unit)))
+                if m.mode == .road {
+                    items.append(CPInformationItem(title: "Grand tour", detail: Format.speed(m.speed, unit)))
+                    items.append(CPInformationItem(title: "Trip", detail: Format.distance(m.tripDistance, unit)))
+                } else {
+                    items.append(CPInformationItem(title: m.lapCount > 0 ? "Lap \(m.lapCount + 1)" : "Out lap",
+                                                   detail: Format.speed(m.speed, unit)))
+                }
                 if let last = m.lastLap { items.append(CPInformationItem(title: "Last lap", detail: Format.lapTime(last.duration))) }
                 if let best = m.bestLap { items.append(CPInformationItem(title: "Best lap", detail: Format.lapTime(best.duration))) }
                 if m.isStationary {
@@ -73,8 +78,11 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 items.append(CPInformationItem(title: "Last mission", detail: last.trackName))
                 if let best = last.bestLap { items.append(CPInformationItem(title: "Best lap", detail: Format.lapTime(best.duration))) }
             }
-            actions.append(CPTextButton(title: "Arm Vesper", textStyle: .confirm) { [weak self] _ in
-                Task { await self?.model.arm(trackName: ""); self?.update() }
+            actions.append(CPTextButton(title: "Track day", textStyle: .confirm) { [weak self] _ in
+                Task { await self?.model.arm(trackName: "", mode: .track); self?.update() }
+            })
+            actions.append(CPTextButton(title: "Grand tour", textStyle: .normal) { [weak self] _ in
+                Task { await self?.model.arm(trackName: "", mode: .road); self?.update() }
             })
         }
         template.items = items

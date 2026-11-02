@@ -17,6 +17,8 @@ struct FilmOverlay: @unchecked Sendable {
         var unit: SpeedUnit
         var redline: Double
         var logo: UIImage?
+        var mode: DriveMode = .track
+        var showSpeed = true
     }
 
     let plan: HighlightPlan
@@ -54,7 +56,7 @@ struct FilmOverlay: @unchecked Sendable {
 
         if !inIntro && !inOutro {
             gauges(c, w: w, h: h, missionTime: hit.missionTime)
-            lapClock(c, w: w, h: h, missionTime: hit.missionTime)
+            if style.mode == .track { lapClock(c, w: w, h: h, missionTime: hit.missionTime) }
             caption(c, w: w, h: h, t: t, index: hit.index)
         }
         brandMark(c, w: w, h: h, faded: inIntro)
@@ -78,9 +80,11 @@ struct FilmOverlay: @unchecked Sendable {
         let maxSpeed: Double = style.unit == .mph ? 200 : 320
         let step: Double = style.unit == .mph ? 20 : 40
 
-        // Speedometer: clockwise, 0 at lower left.
-        dial(c, center: CGPoint(x: w * 0.24, y: y), radius: r, value: speed, max: maxSpeed, step: step,
-             clockwise: true, redFrom: nil, label: style.unit.label, readout: "\(Int(speed.rounded()))")
+        // Speedometer: clockwise, 0 at lower left. Optional on grand tours.
+        if style.showSpeed {
+            dial(c, center: CGPoint(x: w * 0.24, y: y), radius: r, value: speed, max: maxSpeed, step: step,
+                 clockwise: true, redFrom: nil, label: style.unit.label, readout: "\(Int(speed.rounded()))")
+        }
 
         // Tachometer: anticlockwise, 0 at lower right, like the DB9's.
         let rpm = track.rpm(at: missionTime)
@@ -298,8 +302,14 @@ struct FilmOverlay: @unchecked Sendable {
         }
         text("\(style.callsign.uppercased()) WILL RETURN", at: CGPoint(x: w / 2, y: h * 0.44), size: w * 0.07,
              color: gold, serif: true, center: true)
-        var stats = ["V-MAX \(Format.speed(track.maxSpeed, style.unit))", "PEAK \(Format.g(track.peakLateralG))"]
-        if let best = laps.min(by: { $0.duration < $1.duration }) { stats.append("BEST LAP \(Format.lapTime(best.duration))") }
+        var stats: [String]
+        if style.mode == .road {
+            stats = ["\(Format.distance(track.distance, style.unit)) · \(Format.duration(track.duration))",
+                     "BEST BEND \(Format.g(track.peakLateralG))"]
+        } else {
+            stats = ["V-MAX \(Format.speed(track.maxSpeed, style.unit))", "PEAK \(Format.g(track.peakLateralG))"]
+            if let best = laps.min(by: { $0.duration < $1.duration }) { stats.append("BEST LAP \(Format.lapTime(best.duration))") }
+        }
         for (i, s) in stats.enumerated() {
             text(s, at: CGPoint(x: w / 2, y: h * 0.52 + CGFloat(i) * h * 0.035), size: w * 0.032, color: silver, kern: 4, center: true)
         }

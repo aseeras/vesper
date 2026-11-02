@@ -4,6 +4,11 @@ A private iPhone app that films your track day through Meta glasses and turns it
 short, cinematic film: aperture title sequence, gauges in the style of a V12 grand tourer,
 slow-motion on your best corners, the engine's own sound, and a soundtrack cut to the beat.
 
+Two modes:
+
+- **Track day**: lap timing, fastest lap, V-max, hardest braking.
+- **Grand tour**: for spirited drives on the open road. The film is built from your best bends and pulls plus the scenery along the way, with trip distance and time in place of lap times. It doesn't brag about top speed, and the speedometer can be switched off for these films. Traffic lights won't end the recording; it waits until you've been parked 5 minutes.
+
 It's built to be hands-free. You arm it in the paddock, and from then on you never touch it:
 
 - **Recording starts and stops by itself.** Filming begins once you hold speed and ends after you've been parked for 45 seconds.

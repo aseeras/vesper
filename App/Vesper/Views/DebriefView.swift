@@ -18,7 +18,7 @@ struct DebriefView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text(mission.codename).tracked(11, Theme.gold)
+                Text("\(mission.mode.title) · \(mission.codename)").tracked(11, Theme.gold)
                 Text(mission.trackName).font(Theme.title(32)).foregroundStyle(.white)
                 Text("\(mission.car) · \(mission.date.formatted(date: .long, time: .shortened))").tracked(10)
 
@@ -53,7 +53,24 @@ struct DebriefView: View {
         .overlay(Rectangle().stroke(Theme.gold.opacity(0.4)))
     }
 
-    private var stats: some View {
+    @ViewBuilder private var stats: some View {
+        if mission.mode == .road {
+            Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                GridRow {
+                    stat("Distance", Format.distance(track.distance, mission.unit))
+                    stat("Time", Format.duration(track.duration))
+                }
+                GridRow {
+                    stat("Best bend", Format.g(track.peakLateralG))
+                    stat("Peak revs", track.rpm.map(\.rpm).max().map { "\(Int($0 / 100) * 100) rpm" } ?? "—")
+                }
+            }
+        } else {
+            trackStats
+        }
+    }
+
+    private var trackStats: some View {
         Grid(horizontalSpacing: 12, verticalSpacing: 12) {
             GridRow {
                 stat("V-max", Format.speed(track.maxSpeed, mission.unit))
@@ -135,9 +152,11 @@ struct DebriefView: View {
         var options = HighlightOptions()
         options.targetDuration = settings.filmLength
         options.unit = mission.unit
+        options.mode = mission.mode
         let style = FilmOverlay.Style(callsign: settings.callsign, car: mission.car, codename: mission.codename,
                                       trackName: mission.trackName, date: mission.date, unit: mission.unit,
-                                      redline: settings.redline, logo: BrandAssets.logo)
+                                      redline: settings.redline, logo: BrandAssets.logo, mode: mission.mode,
+                                      showSpeed: mission.mode == .track || settings.showSpeedOnRoad)
         let input = HighlightComposer.Input(mission: mission, track: track, options: options, style: style,
                                             music: BrandAssets.music)
         do {

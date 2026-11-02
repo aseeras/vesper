@@ -90,12 +90,12 @@ struct MissionRow: View {
 
     var body: some View {
         DossierCard(stamp: mission.hasFilm ? "Film ready" : nil) {
-            Text(mission.codename).tracked(10, Theme.gold)
+            Text("\(mission.mode.title) · \(mission.codename)").tracked(10, Theme.gold)
             Text(mission.trackName).font(Theme.title(24)).foregroundStyle(.white)
             HStack(spacing: 16) {
                 Label(mission.date.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
                 if let best = mission.bestLap { Label(Format.lapTime(best.duration), systemImage: "stopwatch") }
-                Label("\(mission.laps.count) laps", systemImage: "flag.checkered")
+                if mission.mode == .track { Label("\(mission.laps.count) laps", systemImage: "flag.checkered") }
             }
             .font(.caption).foregroundStyle(Theme.silver)
         }

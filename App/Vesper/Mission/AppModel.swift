@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import VesperCore
 
 /// Shared state for the phone UI and the CarPlay screen.
 @MainActor
@@ -15,11 +16,13 @@ final class AppModel {
     /// Set when a mission finishes so the phone can jump to its debrief.
     var finishedMissionID: UUID?
 
-    func arm(trackName: String) async {
+    func arm(trackName: String, mode: DriveMode) async {
         guard activeMission == nil else { return }
+        settings.lastMode = mode
         let c = MissionController(glasses: glasses, store: store, settings: settings)
         activeMission = c
-        await c.arm(trackName: trackName.isEmpty ? (store.missions.first?.trackName ?? "") : trackName, gate: nil)
+        let lastSameMode = store.missions.first { $0.mode == mode }?.trackName ?? ""
+        await c.arm(trackName: trackName.isEmpty ? lastSameMode : trackName, mode: mode, gate: nil)
     }
 
     func close(finished: UUID?) {

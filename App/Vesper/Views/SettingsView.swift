@@ -32,6 +32,7 @@ struct SettingsView: View {
                     Stepper("End after parked \(Int(s.autoStopMinutes * 60)) s", value: $s.autoStopMinutes, in: 0.25...5, step: 0.25)
                     Toggle("Spoken call-outs", isOn: $s.voiceCallouts)
                     Toggle("Lens display (Ray-Ban Display)", isOn: $s.lensDisplay)
+                    Toggle("Speedometer in grand tour films", isOn: $s.showSpeedOnRoad)
                     Stepper(String(format: "Glasses delay %.2f s", s.glassesLatency), value: $s.glassesLatency, in: 0...1, step: 0.05)
                 } header: { Text("Hands-free") } footer: {
                     Text("If the gauges in your film run ahead of the picture, raise the glasses delay.")

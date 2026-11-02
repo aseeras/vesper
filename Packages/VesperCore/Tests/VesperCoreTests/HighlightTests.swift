@@ -63,4 +63,30 @@ final class HighlightTests: XCTestCase {
         let plan = HighlightEngine.plan(track: track, laps: [], options: options)
         XCTAssertGreaterThan(plan.totalDuration, 5)
     }
+
+    func testGrandTourKeepsTheBendsAndFillsWithScenery() {
+        let (track, _) = session()
+        var options = HighlightOptions()
+        options.mode = .road
+        options.targetDuration = 60
+        options.videoEnd = track.duration
+        let plan = HighlightEngine.plan(track: track, laps: [], options: options)
+        let captions = plan.segments.compactMap(\.caption)
+        XCTAssertFalse(captions.contains { $0.hasPrefix("V-MAX") || $0.hasPrefix("BRAKING") || $0.hasPrefix("FASTEST") })
+        XCTAssertTrue(captions.contains { $0.hasPrefix("LATERAL") })
+        XCTAssertTrue(plan.moments.contains { $0.kind == .scenery })
+        // Scenery tops the film up close to the requested length.
+        XCTAssertGreaterThan(plan.totalDuration, options.targetDuration * 0.75)
+        XCTAssertLessThanOrEqual(plan.totalDuration, options.targetDuration + 4 * options.beat)
+        for (a, b) in zip(plan.segments, plan.segments.dropFirst()) {
+            XCTAssertLessThanOrEqual(a.sourceEnd, b.sourceStart + 1e-9)
+        }
+    }
+
+    func testDistanceOfACircle() {
+        let fixes = Fixtures.circle(radius: 200, speed: 30, laps: 1, hz: 10)
+        XCTAssertEqual(TelemetryTrack(fixes: fixes).distance, 2 * .pi * 200, accuracy: 5)
+        XCTAssertEqual(Format.distance(1609.344 * 42.3, .mph), "42.3 MI")
+        XCTAssertEqual(Format.duration(84 * 60), "1H 24M")
+    }
 }

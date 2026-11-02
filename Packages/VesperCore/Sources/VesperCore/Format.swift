@@ -29,6 +29,17 @@ public enum Format {
         "\(Int(unit.convert(metresPerSecond).rounded())) \(unit.label)"
     }
 
+    /// "42.3 MI" or "68.1 KM".
+    public static func distance(_ metres: Double, _ unit: SpeedUnit) -> String {
+        unit == .mph ? String(format: "%.1f MI", metres / 1609.344) : String(format: "%.1f KM", metres / 1000)
+    }
+
+    /// "1H 24M" or "38M".
+    public static func duration(_ seconds: Double) -> String {
+        let m = Int(seconds / 60)
+        return m >= 60 ? "\(m / 60)H \(m % 60)M" : "\(m)M"
+    }
+
     public static func g(_ value: Double) -> String { String(format: "%.2f G", abs(value)) }
 
     /// Mission codename from a date, e.g. "OPERATION NIGHTSHADE".
