@@ -31,6 +31,8 @@ struct VesperApp: App {
             .tint(Theme.gold)
             .task { await model.glasses.observe() }
             .task { await model.glasses.observeDevices() }
+            .task { await model.glasses.observeActiveDevice() }
+            .task { await model.glasses.observeActiveDisplayDevice() }
             .onOpenURL { url in Task { await model.glasses.handle(url: url) } }
         }
     }

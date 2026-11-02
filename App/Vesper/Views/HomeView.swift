@@ -73,10 +73,20 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Glasses").tracked(10, Theme.gold)
                     Text(glasses.link.label).font(.headline).foregroundStyle(.white)
+                    if glasses.isRegistered, settings.lensDisplay {
+                        Text(glasses.hasDisplayDevice ? glasses.lens.status : "Display glasses not detected")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let error = glasses.lastError {
+                        Text(error).font(.caption2).foregroundStyle(.red).lineLimit(3)
+                    }
                 }
                 Spacer()
                 if !glasses.isRegistered {
                     Button("Pair") { Task { await glasses.register() } }
+                        .buttonStyle(GoldButtonStyle(prominent: false)).frame(width: 90)
+                } else if settings.lensDisplay, glasses.lens.status != "Lens live" {
+                    Button("Lens") { glasses.retryWelcome() }
                         .buttonStyle(GoldButtonStyle(prominent: false)).frame(width: 90)
                 }
             }

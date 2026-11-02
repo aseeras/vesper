@@ -48,6 +48,16 @@ final class GlassesManager {
     @ObservationIgnored private let streamTokens = ListenerTokenBag()
     @ObservationIgnored private var sessionTask: Task<Void, Never>?
     @ObservationIgnored private var wantsLens = false
+    /// Long-lived selectors, as in Meta's samples: an AutoDeviceSelector learns the active
+    /// device from the device stream, so one created on the spot has no device yet and
+    /// createSession throws noEligibleDevice.
+    @ObservationIgnored private let anySelector: AutoDeviceSelector
+    @ObservationIgnored private let displaySelector: AutoDeviceSelector
+    /// Ray-Ban Display glasses connected and selectable right now.
+    private(set) var hasDisplayDevice = false
+    @ObservationIgnored private var hasAnyActiveDevice = false
+    /// Last connection problem, kept on screen instead of being replaced by "Glasses ready".
+    private(set) var lastError: String?
     @ObservationIgnored private var wantsCamera = false
     @ObservationIgnored private var sessionIsStarted = false
     @ObservationIgnored private var errorTask: Task<Void, Never>?
@@ -66,6 +76,8 @@ final class GlassesManager {
 
     init() {
         previewLayer.videoGravity = .resizeAspect
+        anySelector = AutoDeviceSelector(wearables: Wearables.shared)
+        displaySelector = AutoDeviceSelector(wearables: Wearables.shared, filter: { device in device.supportsDisplay() })
     }
 
     func observe() async {
@@ -77,6 +89,18 @@ final class GlassesManager {
         for await devices in wearables.devicesStream() {
             hasDevice = !devices.isEmpty
             if isRegistered, session == nil { link = hasDevice ? .ready : .waitingForGlasses }
+        }
+    }
+
+    /// Whether any glasses are selectable for a recording session.
+    func observeActiveDevice() async {
+        for await id in anySelector.activeDeviceStream() { hasAnyActiveDevice = id != nil }
+    }
+
+    /// Whether Ray-Ban Display glasses are selectable; the welcome goes up when they appear.
+    func observeActiveDisplayDevice() async {
+        for await id in displaySelector.activeDeviceStream() {
+            hasDisplayDevice = id != nil
             showWelcomeIfPossible()
         }
     }
@@ -117,8 +141,15 @@ final class GlassesManager {
     /// As soon as the app is open and paired Ray-Ban Display glasses are on, put the
     /// racetrack welcome on the lens. The session stays open, and arming a drive adds the
     /// camera to it.
+    /// Manual retry from the home screen.
+    func retryWelcome() {
+        lastError = nil
+        showWelcomeIfPossible()
+        if !hasDisplayDevice { lastError = "No Ray-Ban Display glasses available to Vesper. Are they on and connected in Meta AI?" }
+    }
+
     private func showWelcomeIfPossible() {
-        guard isRegistered, hasDevice, session == nil, lensEnabled() else { return }
+        guard isRegistered, hasDisplayDevice, session == nil, lensEnabled() else { return }
         wantsLens = true
         lens.showWelcome()
         openSession(displayOnly: true)
@@ -143,14 +174,18 @@ final class GlassesManager {
             if sessionIsStarted { sessionStarted(session) }
             return
         }
+        // Give the selector a moment to pick up the glasses if they've only just connected.
+        for _ in 0..<20 where !(hasAnyActiveDevice || hasDisplayDevice) {
+            try? await Task.sleep(for: .milliseconds(250))
+        }
         openSession(displayOnly: false)
     }
 
     private func openSession(displayOnly: Bool) {
         do {
-            let selector = displayOnly
-                ? AutoDeviceSelector(wearables: wearables, filter: { device in device.supportsDisplay() })
-                : AutoDeviceSelector(wearables: wearables)
+            lastError = nil
+            // Prefer the Display glasses whenever the lens is wanted and they're available.
+            let selector = (displayOnly || (wantsLens && hasDisplayDevice)) ? displaySelector : anySelector
             let session = try wearables.createSession(deviceSelector: selector)
             self.session = session
             link = .connecting
@@ -169,6 +204,7 @@ final class GlassesManager {
             errorTask = Task { [weak self] in
                 for await error in errors {
                     print("Glasses session error: \(error)")
+                    self?.lastError = "\(error)"
                     if error == .datAppOnTheGlassesUpdateRequired {
                         self?.link = .failed("Update Vesper on the glasses in the Meta AI app")
                     }
@@ -177,6 +213,7 @@ final class GlassesManager {
             try session.start()
         } catch {
             link = .failed("Glasses: \(error.localizedDescription)")
+            lastError = "\(error)"
             cleanUp()
         }
     }
