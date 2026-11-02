@@ -71,6 +71,17 @@ paid for longer), and your glasses set up in the Meta AI app.
 
 Apps built on Meta's toolkit can't go on the App Store yet, so install Vesper directly from Xcode or through TestFlight.
 
+### TestFlight (no Mac needed)
+
+`.github/workflows/testflight.yml` builds Vesper on GitHub and uploads it to TestFlight on every push to `main` (or from the Actions tab). One-time setup, which needs a paid Apple Developer Program membership:
+
+1. In [App Store Connect](https://appstoreconnect.apple.com/apps), create a new iOS app with bundle ID `com.aseeras.vesper` (register the ID under Certificates, Identifiers & Profiles first if it isn't offered).
+2. Under Users and Access → Integrations → App Store Connect API, create a key with the **App Manager** role. Download the `.p8` file and note the Key ID and Issuer ID.
+3. In this repo's Settings → Secrets and variables → Actions, add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8` (paste the whole `.p8` file).
+4. Run the TestFlight workflow. When the build has processed, add yourself as an internal tester and install it from the TestFlight app.
+
+Internal TestFlight builds skip Apple's beta review, which matters because Meta's toolkit isn't App Store-approved yet.
+
 ### CarPlay
 
 CarPlay needs Apple's **CarPlay Driving Task** entitlement. Request it at
