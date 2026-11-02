@@ -29,6 +29,9 @@ struct MissionView: View {
         VStack(spacing: 18) {
             Text("Armed").font(Theme.title(40)).foregroundStyle(Theme.gold)
             Text(controller.glasses.link.label).tracked(11)
+            if settings.lensDisplay {
+                Text(controller.glasses.lens.status).tracked(11)
+            }
             if controller.glasses.link == .streaming, controller.isStationary {
                 GlassesPreview(layer: controller.glasses.previewLayer)
                     .aspectRatio(9 / 16, contentMode: .fit)
