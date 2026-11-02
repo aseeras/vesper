@@ -4,11 +4,16 @@ A private iPhone app that films your track day through Meta glasses and turns it
 short, cinematic film: aperture title sequence, gauges in the style of a V12 grand tourer,
 slow-motion on your best corners, the engine's own sound, and a soundtrack cut to the beat.
 
+Two modes:
+
+- **Track day**: lap timing, fastest lap, V-max, hardest braking.
+- **Grand tour**: for spirited drives on the open road. The film is built from your best bends and pulls plus the scenery along the way, with trip distance and time in place of lap times. It doesn't brag about top speed, and the speedometer can be switched off for these films. Traffic lights won't end the recording; it waits until you've been parked 5 minutes.
+
 It's built to be hands-free. You arm it in the paddock, and from then on you never touch it:
 
 - **Recording starts and stops by itself.** Filming begins once you hold speed and ends after you've been parked for 45 seconds.
 - **The glasses talk to you.** A British voice calls out each lap time and your fastest laps through the glasses' speakers.
-- **The lens shows only what you need.** On Meta Ray-Ban Display glasses, the in-lens screen shows your lap number, last lap time, gap to your best lap and top speed. It changes only when you cross the line, never as a running clock.
+- **Speed and revs in your eye-line.** On Meta Ray-Ban Display glasses, the in-lens screen shows live speed and RPM, with your lap and best lap underneath. When you cross the line, your lap time and gap to your best flash up for six seconds.
 - **CarPlay.** The car's screen shows status and lap times, with Arm and End buttons that only work while you're stopped.
 - **The phone can stay in your pocket.** The glasses stream compressed video that keeps recording with the phone locked.
 
@@ -65,6 +70,17 @@ paid for longer), and your glasses set up in the Meta AI app.
 5. In Vesper, tap **Pair**. The Meta AI app opens to approve the connection.
 
 Apps built on Meta's toolkit can't go on the App Store yet, so install Vesper directly from Xcode or through TestFlight.
+
+### TestFlight (no Mac needed)
+
+`.github/workflows/testflight.yml` builds Vesper on GitHub and uploads it to TestFlight on every push to `main` (or from the Actions tab). One-time setup, which needs a paid Apple Developer Program membership:
+
+1. In [App Store Connect](https://appstoreconnect.apple.com/apps), create a new iOS app with bundle ID `com.aseeras.vesper` (register the ID under Certificates, Identifiers & Profiles first if it isn't offered).
+2. Under Users and Access → Integrations → App Store Connect API, create a key with the **Admin** role (it needs to manage cloud signing certificates). Download the `.p8` file and note the Key ID and Issuer ID.
+3. In this repo's Settings → Secrets and variables → Actions, add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8` (paste the whole `.p8` file).
+4. Run the TestFlight workflow. When the build has processed, add yourself as an internal tester and install it from the TestFlight app.
+
+Internal TestFlight builds skip Apple's beta review, which matters because Meta's toolkit isn't App Store-approved yet.
 
 ### CarPlay
 
