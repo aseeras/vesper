@@ -1,0 +1,8 @@
+.DS_Store
+/Vesper.xcodeproj
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+Config/Secrets.xcconfig
+*.wav
