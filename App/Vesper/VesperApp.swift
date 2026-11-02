@@ -2,11 +2,15 @@ import SwiftUI
 
 @main
 struct VesperApp: App {
-    @State private var model = AppModel.shared
+    @State private var model: AppModel
     @State private var showIntro = true
 
     init() {
+        // The Meta toolkit must be configured before anything touches Wearables.shared,
+        // and AppModel creates the GlassesManager that does. Stored-property defaults run
+        // before init's body, so the model is created here, after configure.
         GlassesManager.configureAtLaunch()
+        _model = State(initialValue: AppModel.shared)
     }
 
     var body: some Scene {

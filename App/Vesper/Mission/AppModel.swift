@@ -6,7 +6,11 @@ import VesperCore
 @MainActor
 @Observable
 final class AppModel {
-    static let shared = AppModel()
+    /// Configures the Meta toolkit first, whichever scene (phone or CarPlay) asks for the model.
+    static let shared: AppModel = {
+        GlassesManager.configureAtLaunch()
+        return AppModel()
+    }()
 
     let glasses = GlassesManager()
     let store = MissionStore()

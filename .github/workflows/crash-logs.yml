@@ -1,0 +1,46 @@
+# Pulls crash reports that testers shared from TestFlight ("Share" on the crash popup)
+# using the same App Store Connect key as the TestFlight workflow. Run it from the Actions tab.
+name: TestFlight crash logs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch shared crash reports
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          BUNDLE_ID: com.aseeras.vesper
+        run: |
+          pip install --quiet pyjwt cryptography requests
+          python3 - <<'EOF'
+          import os, time, jwt, requests
+          key = os.environ["ASC_KEY_P8"].strip() + "\n"
+          now = int(time.time())
+          token = jwt.encode(
+              {"iss": os.environ["ASC_ISSUER_ID"], "iat": now, "exp": now + 1200, "aud": "appstoreconnect-v1"},
+              key, algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
+          H = {"Authorization": f"Bearer {token}"}
+          API = "https://api.appstoreconnect.apple.com/v1"
+
+          def get(url, **params):
+              r = requests.get(url, headers=H, params=params, timeout=60)
+              if r.status_code >= 400:
+                  print(f"{r.status_code} {url}\n{r.text[:2000]}")
+                  r.raise_for_status()
+              return r.json()
+
+          app = get(f"{API}/apps", **{"filter[bundleId]": os.environ["BUNDLE_ID"]})["data"][0]
+          subs = get(f"{API}/apps/{app['id']}/betaFeedbackCrashSubmissions", limit=5)["data"]
+          print(f"{len(subs)} shared crash report(s)")
+          for s in subs:
+              a = s["attributes"]
+              print("=" * 80)
+              print(a.get("createdDate"), a.get("deviceModel"), a.get("osVersion"), a.get("comment") or "")
+              log = get(f"{API}/betaFeedbackCrashSubmissions/{s['id']}/crashLog")["data"]["attributes"].get("logText", "")
+              print(log[:60000])
+          EOF

@@ -50,7 +50,12 @@ final class GlassesManager {
     @ObservationIgnored private var wantsLens = false
     @ObservationIgnored nonisolated(unsafe) private var previewEnabled = true
 
+    private static var configured = false
+
+    /// Must run before the first use of `Wearables.shared`. Safe to call more than once.
     static func configureAtLaunch() {
+        guard !configured else { return }
+        configured = true
         do { try Wearables.configure() } catch { print("Wearables.configure failed: \(error)") }
     }
 
