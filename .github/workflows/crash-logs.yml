@@ -4,8 +4,6 @@ name: TestFlight crash logs
 
 on:
   workflow_dispatch:
-  push:
-    paths: [.github/workflows/crash-logs.yml]
 
 jobs:
   fetch:
