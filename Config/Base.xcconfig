@@ -1,0 +1,12 @@
+// Shared build settings. Personal values live in Secrets.xcconfig (git-ignored).
+
+// Developer Mode works with these placeholders. Replace them with the IDs from the
+// Wearables Developer Center if you register Vesper there.
+META_APP_ID = 0
+CLIENT_TOKEN = 0
+
+// Switch to App/Vesper/Resources/Vesper-CarPlay.entitlements once Apple grants
+// the CarPlay Driving Task entitlement.
+VESPER_ENTITLEMENTS = App/Vesper/Resources/Vesper.entitlements
+
+#include? "Secrets.xcconfig"
