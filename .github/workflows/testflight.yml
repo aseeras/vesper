@@ -72,14 +72,13 @@ jobs:
           fi
           echo "Archived build ${{ github.run_number }}"
 
-      - name: Upload to TestFlight
+      - name: Export signed IPA
         env:
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM" Config/ExportOptions.plist
-          set -o pipefail
           if ! xcodebuild -exportArchive \
               -archivePath "$RUNNER_TEMP/Vesper.xcarchive" \
               -exportOptionsPlist Config/ExportOptions.plist \
@@ -88,11 +87,32 @@ jobs:
               -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
               -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER" > export.log 2>&1; then
             grep -iE "error|invalid|failed" export.log | sort -u | head -60
-            tail -40 export.log
+            find /var/folders -name "IDEDistribution*.log" -newer archive.log 2>/dev/null | head -3 | xargs -I{} sh -c 'echo "== {}"; grep -iE "error|status|message" "{}" | tail -40'
             exit 1
           fi
-          echo "Uploaded build ${{ github.run_number }} to App Store Connect. It appears in TestFlight after processing (usually 5–15 minutes)."
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          # altool finds the key by ID in this folder, and reports App Store Connect's own error text.
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp "$RUNNER_TEMP/asc/AuthKey.p8" ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          # altool can exit 0 even when App Store Connect rejects the upload, so check its output too.
+          set +e
+          xcrun altool --upload-app --type ios \
+            --file "$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)" \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER" --show-progress 2>&1 | tee upload.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ] || grep -q "ERROR" upload.log || ! grep -qiE "UPLOAD SUCCEEDED|No errors uploading" upload.log; then
+            echo "::error::Upload to App Store Connect failed (see ERROR lines above)."
+            exit 1
+          fi
+          echo "Uploaded build ${{ github.run_number }}. It appears in TestFlight after Apple processes it (usually 5–15 minutes)."
 
       - name: Remove key
         if: always()
-        run: rm -rf "$RUNNER_TEMP/asc"
+        run: rm -rf "$RUNNER_TEMP/asc" ~/.appstoreconnect
