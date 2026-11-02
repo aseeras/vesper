@@ -26,23 +26,23 @@ struct Mission: Codable, Identifiable, Hashable {
 final class MissionStore {
     private(set) var missions: [Mission] = []
 
-    static let root: URL = {
+    nonisolated static let root: URL = {
         let url = URL.documentsDirectory.appending(path: "Missions", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()
 
-    static func folder(for id: UUID) -> URL {
+    nonisolated static func folder(for id: UUID) -> URL {
         let url = root.appending(path: id.uuidString, directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
 
-    static func videoURL(_ id: UUID) -> URL { folder(for: id).appending(path: "glasses.mp4") }
-    static func audioURL(_ id: UUID) -> URL { folder(for: id).appending(path: "engine.m4a") }
-    static func filmURL(_ id: UUID) -> URL { folder(for: id).appending(path: "film.mp4") }
-    static func telemetryURL(_ id: UUID) -> URL { folder(for: id).appending(path: "telemetry.json") }
-    static func missionURL(_ id: UUID) -> URL { folder(for: id).appending(path: "mission.json") }
+    nonisolated static func videoURL(_ id: UUID) -> URL { folder(for: id).appending(path: "glasses.mp4") }
+    nonisolated static func audioURL(_ id: UUID) -> URL { folder(for: id).appending(path: "engine.m4a") }
+    nonisolated static func filmURL(_ id: UUID) -> URL { folder(for: id).appending(path: "film.mp4") }
+    nonisolated static func telemetryURL(_ id: UUID) -> URL { folder(for: id).appending(path: "telemetry.json") }
+    nonisolated static func missionURL(_ id: UUID) -> URL { folder(for: id).appending(path: "mission.json") }
 
     init() { reload() }
 
