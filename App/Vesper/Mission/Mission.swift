@@ -7,6 +7,9 @@ struct Mission: Codable, Identifiable, Hashable {
     var codename: String
     var trackName: String
     var car: String
+    /// The car's engine and redline when the drive was recorded. Optional for older missions.
+    var carCylinders: Int?
+    var carRedline: Double?
     /// Track day or grand tour. Optional so missions saved before modes existed still load.
     var driveMode: DriveMode?
     var date: Date

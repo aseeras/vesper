@@ -61,7 +61,23 @@ struct HomeView: View {
                 }
                 Text("VESPER").font(Theme.title(40)).foregroundStyle(Theme.gold).tracking(8)
             }
-            Text("Eyes only · \(settings.callsign) · \(settings.car)").tracked(10)
+            if settings.cars.count > 1 {
+                // Quick switch between cars in the garage.
+                Menu {
+                    ForEach(settings.cars) { car in
+                        Button { settings.activeCarID = car.id } label: {
+                            if car.id == settings.activeCarID { Label(car.name, systemImage: "checkmark") } else { Text(car.name) }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Eyes only · \(settings.callsign) · \(settings.car)").tracked(10)
+                        Image(systemName: "chevron.down").font(.caption2).foregroundStyle(Theme.gold)
+                    }
+                }
+            } else {
+                Text("Eyes only · \(settings.callsign) · \(settings.car)").tracked(10)
+            }
         }
         .padding(.top, 8)
     }

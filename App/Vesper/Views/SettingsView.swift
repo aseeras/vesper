@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var pickingMusic = false
     @State private var note: String?
     @State private var refresh = 0
+    @State private var editingCar: Car?
 
     var body: some View {
         @Bindable var s = settings
@@ -18,14 +19,37 @@ struct SettingsView: View {
             Form {
                 Section("Driver") {
                     TextField("Callsign", text: $s.callsign)
-                    TextField("Car", text: $s.car)
                     Picker("Units", selection: $s.unit) { ForEach(SpeedUnit.allCases, id: \.self) { Text($0.label) } }
                 }
                 Section {
-                    Stepper("Cylinders: \(s.cylinders)", value: $s.cylinders, in: 4...16, step: 2)
-                    Stepper("Redline: \(Int(s.redline)) rpm", value: $s.redline, in: 4_000...9_000, step: 100)
-                } header: { Text("Engine") } footer: {
-                    Text("Vesper reads revs from the engine's sound. DB9: 12 cylinders.")
+                    ForEach(s.cars) { car in
+                        HStack {
+                            Button { s.activeCarID = car.id } label: {
+                                HStack {
+                                    Image(systemName: car.id == s.activeCarID ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(Theme.gold)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(car.name).foregroundStyle(.white)
+                                        Text("\(car.engineLabel) · redline \(Int(car.redline).formatted()) rpm")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            Button { editingCar = car } label: { Image(systemName: "pencil") }
+                                .buttonStyle(.borderless).tint(Theme.gold)
+                        }
+                        .swipeActions {
+                            if s.cars.count > 1 {
+                                Button("Delete", role: .destructive) { s.removeCar(car) }
+                            }
+                        }
+                    }
+                    Button { editingCar = s.addCar() } label: { Label("Add a car", systemImage: "plus") }
+                } header: { Text("Garage") } footer: {
+                    Text("Tap a car to take it on your next drive. Vesper reads revs from the engine's sound, so set each car's cylinders correctly. Swipe left to delete.")
                 }
                 Section {
                     Stepper("Start above \(Int(s.autoStartSpeed)) \(s.unit.label)", value: $s.autoStartSpeed, in: 5...60, step: 5)
@@ -78,10 +102,46 @@ struct SettingsView: View {
                     note = "Logo saved."; refresh += 1
                 }
             }
+            .sheet(item: $editingCar) { car in
+                CarEditor(car: car) { edited in
+                    if let i = settings.cars.firstIndex(where: { $0.id == edited.id }) { settings.cars[i] = edited }
+                }
+            }
             .fileImporter(isPresented: $pickingMusic, allowedContentTypes: [.audio]) { result in
                 do { try BrandAssets.setMusic(from: result.get()); note = "Music saved."; refresh += 1 }
                 catch { note = error.localizedDescription }
             }
         }
+    }
+}
+
+/// Name, engine and redline for one car in the garage.
+struct CarEditor: View {
+    @State var car: Car
+    var save: (Car) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $car.name)
+                Stepper("Cylinders: \(car.cylinders)", value: $car.cylinders, in: 2...16)
+                Stepper("Redline: \(Int(car.redline).formatted()) rpm", value: $car.redline, in: 3_000...10_000, step: 100)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Car")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if car.name.trimmingCharacters(in: .whitespaces).isEmpty { car.name = "Car" }
+                        save(car); dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }

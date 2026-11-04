@@ -3,6 +3,19 @@ import SwiftUI
 import UIKit
 import VesperCore
 
+/// One car in the garage. Cylinders drive the engine-sound rev reading; redline sets the film's tach.
+struct Car: Codable, Identifiable, Hashable {
+    var id = UUID()
+    var name: String
+    var cylinders: Int
+    var redline: Double
+
+    /// "V12", "V8", "6-CYL"… for film captions.
+    var engineLabel: String { cylinders >= 6 && cylinders.isMultiple(of: 2) ? "V\(cylinders)" : "\(cylinders)-CYL" }
+
+    static let db9 = Car(name: "DB9", cylinders: 12, redline: 6_800)
+}
+
 /// The driver's preferences. Defaults are tuned for a DB9: 12 cylinders, 7,000 rpm tach.
 @MainActor
 @Observable
@@ -10,9 +23,18 @@ final class DriverSettings {
     private let d = UserDefaults.standard
 
     var callsign: String { didSet { d.set(callsign, forKey: "callsign") } }
-    var car: String { didSet { d.set(car, forKey: "car") } }
-    var cylinders: Int { didSet { d.set(cylinders, forKey: "cylinders") } }
-    var redline: Double { didSet { d.set(redline, forKey: "redline") } }
+    /// Every car Alvin drives. Never empty.
+    var cars: [Car] { didSet { saveGarage() } }
+    var activeCarID: UUID { didSet { d.set(activeCarID.uuidString, forKey: "activeCarID") } }
+
+    /// The car the next drive is in.
+    var activeCar: Car {
+        get { cars.first { $0.id == activeCarID } ?? cars[0] }
+        set { if let i = cars.firstIndex(where: { $0.id == newValue.id }) { cars[i] = newValue } }
+    }
+    var car: String { activeCar.name }
+    var cylinders: Int { activeCar.cylinders }
+    var redline: Double { activeCar.redline }
     var unit: SpeedUnit { didSet { d.set(unit.rawValue, forKey: "unit") } }
     var autoStartSpeed: Double { didSet { d.set(autoStartSpeed, forKey: "autoStartSpeed") } }
     var autoStopMinutes: Double { didSet { d.set(autoStopMinutes, forKey: "autoStopMinutes") } }
@@ -28,9 +50,15 @@ final class DriverSettings {
 
     init() {
         callsign = d.string(forKey: "callsign") ?? "ALVIN"
-        car = d.string(forKey: "car") ?? "DB9"
-        cylinders = d.object(forKey: "cylinders") as? Int ?? 12
-        redline = d.object(forKey: "redline") as? Double ?? 6_800
+        // Garage; the first time, carry over the single car from earlier versions.
+        let garage = d.data(forKey: "garage").flatMap { try? JSONDecoder().decode([Car].self, from: $0) } ?? []
+        let cars = garage.isEmpty ? [Car(name: d.string(forKey: "car") ?? Car.db9.name,
+                                         cylinders: d.object(forKey: "cylinders") as? Int ?? Car.db9.cylinders,
+                                         redline: d.object(forKey: "redline") as? Double ?? Car.db9.redline)] : garage
+        self.cars = cars
+        activeCarID = d.string(forKey: "activeCarID").flatMap(UUID.init(uuidString:)).flatMap { id in
+            cars.contains { $0.id == id } ? id : nil
+        } ?? cars[0].id
         unit = SpeedUnit(rawValue: d.string(forKey: "unit") ?? "") ?? .mph
         autoStartSpeed = d.object(forKey: "autoStartSpeed") as? Double ?? 15
         autoStopMinutes = d.object(forKey: "autoStopMinutes") as? Double ?? 0.75
@@ -40,6 +68,27 @@ final class DriverSettings {
         lensDisplay = d.object(forKey: "lensDisplay") as? Bool ?? true
         lastMode = DriveMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .track
         showSpeedOnRoad = d.object(forKey: "showSpeedOnRoad") as? Bool ?? true
+        // didSet doesn't run during init: store the migrated garage so its ids stay stable.
+        if garage.isEmpty {
+            saveGarage()
+            d.set(activeCarID.uuidString, forKey: "activeCarID")
+        }
+    }
+
+    func addCar() -> Car {
+        let car = Car(name: "New car", cylinders: 8, redline: 7_000)
+        cars.append(car)
+        return car
+    }
+
+    func removeCar(_ car: Car) {
+        guard cars.count > 1 else { return }
+        cars.removeAll { $0.id == car.id }
+        if activeCarID == car.id { activeCarID = cars[0].id }
+    }
+
+    private func saveGarage() {
+        if let data = try? JSONEncoder().encode(cars) { d.set(data, forKey: "garage") }
     }
 
     /// Auto-record thresholds in the units the driver thinks in.

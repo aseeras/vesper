@@ -1,7 +1,7 @@
 import Foundation
 
 /// What the Ray-Ban Display lens shows while driving: three short lines, read at a glance.
-/// Live speed and revs between laps; the lap time flashes up when you cross the line.
+/// Live speed between laps; the lap time flashes up when you cross the line.
 public struct LensHUD: Equatable, Sendable {
     public var headline: String
     public var detail: String?
@@ -29,14 +29,16 @@ public struct LensHUD: Equatable, Sendable {
                        footnote: "TOP \(Format.speed(lap.topSpeed, unit))", positive: positive)
     }
 
-    /// Live gauges: big speed, revs underneath, lap and best at the bottom.
-    /// Values are rounded (1 mph, 100 rpm) so the lens only refreshes when a reading really moves.
-    public static func live(speed: Double, rpm: Double?, unit: SpeedUnit, lap: Int, best: Lap?) -> LensHUD {
-        let shownSpeed = Int(unit.convert(max(0, speed)).rounded())
-        let revs = rpm.map { "\((Int(($0 / 100).rounded()) * 100).formatted(.number.grouping(.automatic))) RPM" } ?? "— RPM"
-        var foot = lap > 0 ? "LAP \(lap)" : "OUT LAP"
-        if let best { foot += " · BEST \(Format.lapTime(best.duration))" }
-        return LensHUD(headline: "\(shownSpeed) \(unit.label)", detail: revs, footnote: foot)
+    /// Live gauges: big speed, the lap underneath, the best lap at the bottom. No revs: the
+    /// driver asked for a cleaner lens. Speed is rounded to 1 mph/kmh so the lens only
+    /// refreshes when the reading really moves.
+    public static func live(speed: Double, unit: SpeedUnit, lap: Int, best: Lap?) -> LensHUD {
+        LensHUD(headline: speedLine(speed, unit), detail: lap > 0 ? "LAP \(lap)" : "OUT LAP",
+                footnote: best.map { "BEST \(Format.lapTime($0.duration))" })
+    }
+
+    static func speedLine(_ speed: Double, _ unit: SpeedUnit) -> String {
+        "\(Int(unit.convert(max(0, speed)).rounded())) \(unit.label)"
     }
 
     /// Resting state between laps: lap number and the best so far. No running clock to stare at.
@@ -52,10 +54,9 @@ public struct LensHUD: Equatable, Sendable {
 }
 
 extension LensHUD {
-    /// Grand tour gauges: speed and revs, with trip distance and time underneath.
-    public static func liveRoad(speed: Double, rpm: Double?, unit: SpeedUnit, distance: Double, elapsed: Double) -> LensHUD {
-        var hud = live(speed: speed, rpm: rpm, unit: unit, lap: 0, best: nil)
-        hud.footnote = "TRIP \(Format.distance(distance, unit)) · \(Format.duration(elapsed))"
-        return hud
+    /// Grand tour gauges: speed, with trip distance and time underneath.
+    public static func liveRoad(speed: Double, unit: SpeedUnit, distance: Double, elapsed: Double) -> LensHUD {
+        LensHUD(headline: speedLine(speed, unit), detail: "TRIP \(Format.distance(distance, unit))",
+                footnote: Format.duration(elapsed))
     }
 }

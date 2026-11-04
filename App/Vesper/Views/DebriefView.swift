@@ -153,9 +153,13 @@ struct DebriefView: View {
         options.targetDuration = settings.filmLength
         options.unit = mission.unit
         options.mode = mission.mode
-        let style = FilmOverlay.Style(callsign: settings.callsign, car: mission.car, codename: mission.codename,
+        // The car this drive was in: its own engine and redline, not whichever car is selected now.
+        let garageCar = settings.cars.first { $0.name == mission.car }
+        let cylinders = mission.carCylinders ?? garageCar?.cylinders ?? Car.db9.cylinders
+        let engine = Car(name: mission.car, cylinders: cylinders, redline: 0).engineLabel
+        let style = FilmOverlay.Style(callsign: settings.callsign, car: mission.car, engine: engine, codename: mission.codename,
                                       trackName: mission.trackName, date: mission.date, unit: mission.unit,
-                                      redline: settings.redline, logo: BrandAssets.logo, mode: mission.mode,
+                                      redline: mission.carRedline ?? garageCar?.redline ?? settings.redline, logo: BrandAssets.logo, mode: mission.mode,
                                       showSpeed: mission.mode == .track || settings.showSpeedOnRoad)
         let input = HighlightComposer.Input(mission: mission, track: track, options: options, style: style,
                                             music: BrandAssets.music)

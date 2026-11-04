@@ -65,7 +65,7 @@ final class MissionController {
         announcer.enabled = settings.voiceCallouts
         startUptime = ProcessInfo.processInfo.systemUptime
         mission = Mission(codename: Format.codename(for: .now), trackName: trackName.isEmpty ? (mode == .road ? "Open road" : "Unnamed circuit") : trackName,
-                          car: settings.car, driveMode: mode, date: .now, unit: settings.unit, gate: gate)
+                          car: settings.car, carCylinders: settings.cylinders, carRedline: settings.redline, driveMode: mode, date: .now, unit: settings.unit, gate: gate)
         auto = AutoRecordController(policy: settings.policy(for: mode))
         lapTimer = gate.map { LiveLapTimer(gate: $0) }
         lapCount = 0; lastLap = nil; bestLap = nil; currentLapStart = nil; fixesSinceRolling = []
@@ -73,7 +73,8 @@ final class MissionController {
 
         do { try EngineAudio.configureSession() } catch { self.error = "Audio: \(error.localizedDescription)" }
         let audio = EngineAudio(cylinders: settings.cylinders)
-        audio.onRPM = { [weak self] in self?.rpm = $0; self?.refreshLens() }
+        // Revs still go into the film; the lens shows speed only.
+        audio.onRPM = { [weak self] in self?.rpm = $0 }
         do { try audio.startMonitoring(missionStartUptime: startUptime) } catch { self.error = "Microphone unavailable" }
         engineAudio = audio
 
@@ -122,14 +123,14 @@ final class MissionController {
 
     func reset() { phase = .idle }
 
-    /// Live speed and revs on the Ray-Ban Display lens from the moment the mission is armed.
+    /// Live speed on the Ray-Ban Display lens from the moment the mission is armed.
     private func refreshLens() {
         guard phase == .armed || phase == .rolling else { return }
         if mode == .road {
-            glasses.lens.live(.liveRoad(speed: speed, rpm: rpm, unit: settings.unit, distance: tripDistance,
+            glasses.lens.live(.liveRoad(speed: speed, unit: settings.unit, distance: tripDistance,
                                         elapsed: missionTime - (rollingSince ?? missionTime)))
         } else {
-            glasses.lens.live(.live(speed: speed, rpm: rpm, unit: settings.unit,
+            glasses.lens.live(.live(speed: speed, unit: settings.unit,
                                     lap: lapCount > 0 ? lapCount + 1 : 0, best: bestLap))
         }
     }
