@@ -49,6 +49,8 @@ final class DriverSettings {
     var showSpeedOnRoad: Bool { didSet { d.set(showSpeedOnRoad, forKey: "showSpeedOnRoad") } }
     /// Warn about speed and red-light cameras ahead, on the lens and by voice.
     var cameraAlerts: Bool { didSet { d.set(cameraAlerts, forKey: "cameraAlerts") } }
+    /// "Hey Meta, start Vesper", then "Vesper, track day" and friends through the glasses' mic.
+    var voiceCommands: Bool { didSet { d.set(voiceCommands, forKey: "voiceCommands") } }
 
     init() {
         callsign = d.string(forKey: "callsign") ?? "ALVIN"
@@ -71,6 +73,7 @@ final class DriverSettings {
         lastMode = DriveMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .track
         showSpeedOnRoad = d.object(forKey: "showSpeedOnRoad") as? Bool ?? true
         cameraAlerts = d.object(forKey: "cameraAlerts") as? Bool ?? true
+        voiceCommands = d.object(forKey: "voiceCommands") as? Bool ?? true
         // didSet doesn't run during init: store the migrated garage so its ids stay stable.
         if garage.isEmpty {
             saveGarage()

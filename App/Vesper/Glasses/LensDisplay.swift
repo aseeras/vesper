@@ -21,7 +21,7 @@ final class LensDisplay {
     @ObservationIgnored private var token: AnyListenerToken?
     @ObservationIgnored private var ready = false
     /// What can be on the lens: text cards and gauges, or the racetrack welcome.
-    private enum Content: Equatable { case hud(LensHUD), welcome }
+    private enum Content: Equatable { case hud(LensHUD), welcome(String) }
 
     @ObservationIgnored private var shown: Content?
     @ObservationIgnored private var latest: Content?
@@ -63,10 +63,10 @@ final class LensDisplay {
 
     /// The racetrack welcome, shown from app launch until a drive is armed. Sent as soon as
     /// the lens is ready if it isn't yet.
-    func showWelcome() {
+    func showWelcome(line: String = "Ready when you are") {
         revertTask?.cancel()
         holdUntil = .distantPast
-        Task { await send(.welcome) }
+        Task { await send(.welcome(line)) }
     }
 
     /// Show a card (lap complete, armed, finished). With `hold`, live updates pause that long.
@@ -105,11 +105,11 @@ final class LensDisplay {
                     Text(hud.detail ?? " ", style: .body)
                     Text(hud.footnote ?? " ", style: .meta, color: .secondary)
                 })
-            case .welcome:
+            case .welcome(let line):
                 try await display.send(FlexBox(direction: .column, spacing: 8) {
                     Image(image: RacetrackArt.lensImage)
                     Text("VESPER", style: .heading)
-                    Text("Ready when you are", style: .meta, color: .secondary)
+                    Text(line, style: .meta, color: .secondary)
                 })
             }
             shown = content

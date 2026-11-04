@@ -69,6 +69,13 @@ paid for longer), and your glasses set up in the Meta AI app.
 4. Plug in your iPhone, pick it as the run destination and press Run.
 5. In Vesper, tap **Pair**. The Meta AI app opens to approve the connection.
 
+### Hey Meta and voice commands
+
+"Hey Meta, start Vesper" opens Vesper, then you talk to Vesper by name through the glasses' microphone: "Vesper, track day", "Vesper, grand tour", "Vesper, end mission", "Vesper, stand down", "Vesper, next car" or "Vesper, DB9". Phrases without "Vesper" are ignored. Both features are experimental in Meta's toolkit, so they're only for development and TestFlight builds. To turn them on:
+
+1. In the [Wearables Developer Center](https://wearables.developer.meta.com/), open Vesper's app and switch on **Voice Invocation** (set the spoken name to "Vesper") and **Speech**.
+2. In Vesper, go to Settings → Hey Meta and tap **Allow the glasses microphone**. The Meta AI app opens to approve it.
+
 Apps built on Meta's toolkit can't go on the App Store yet, so install Vesper directly from Xcode or through TestFlight.
 
 ### TestFlight (no Mac needed)
