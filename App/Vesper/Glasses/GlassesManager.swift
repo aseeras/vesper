@@ -4,6 +4,7 @@ import Observation
 import UIKit
 import MWDATCamera
 import MWDATCore
+import MWDATSpeech
 
 /// Talks to the Meta glasses through the Wearables Device Access Toolkit:
 /// registration, the device session, the POV camera stream and the in-lens display.
@@ -65,6 +66,25 @@ final class GlassesManager {
     @ObservationIgnored var lensEnabled: () -> Bool = { true }
     @ObservationIgnored nonisolated(unsafe) private var previewEnabled = true
 
+    // MARK: Voice
+    /// Whether "Hey Meta" and spoken commands are on. Set by AppModel from settings.
+    @ObservationIgnored var voiceEnabled: () -> Bool = { true }
+    /// Every final transcript heard through the glasses' microphone.
+    @ObservationIgnored var onHeard: ((String) -> Void)?
+    /// "Hey Meta, start Vesper".
+    @ObservationIgnored var onVoiceLaunch: (() -> Void)?
+    /// Second line under the racetrack on the lens.
+    @ObservationIgnored var welcomeLine: () -> String = { "Ready when you are" }
+    private(set) var voiceStatus = "Waiting for glasses"
+    private(set) var needsMicrophone = false
+    @ObservationIgnored private var speech: Speech?
+    @ObservationIgnored private var speechHasStarted = false
+    @ObservationIgnored private let speechTokens = ListenerTokenBag()
+    @ObservationIgnored private var invocations: VoiceInvocationsStream?
+    @ObservationIgnored private let invocationTokens = ListenerTokenBag()
+    @ObservationIgnored private var invocationDevice: DeviceIdentifier?
+    @ObservationIgnored private var activeDeviceID: DeviceIdentifier?
+
     private static var configured = false
 
     /// Must run before the first use of `Wearables.shared`. Safe to call more than once.
@@ -94,7 +114,11 @@ final class GlassesManager {
 
     /// Whether any glasses are selectable for a recording session.
     func observeActiveDevice() async {
-        for await id in anySelector.activeDeviceStream() { hasAnyActiveDevice = id != nil }
+        for await id in anySelector.activeDeviceStream() {
+            hasAnyActiveDevice = id != nil
+            activeDeviceID = id
+            listenForHeyMeta()
+        }
     }
 
     /// Whether Ray-Ban Display glasses are selectable; the welcome goes up when they appear.
@@ -111,6 +135,7 @@ final class GlassesManager {
             isRegistered = true
             if session == nil { link = hasDevice ? .ready : .waitingForGlasses }
             showWelcomeIfPossible()
+            listenForHeyMeta()
         case .registering:
             link = .registering
         default:
@@ -148,10 +173,15 @@ final class GlassesManager {
         if !hasDisplayDevice { lastError = "No Ray-Ban Display glasses available to Vesper. Are they on and connected in Meta AI?" }
     }
 
+    /// Put the welcome back up and reopen the glasses session, e.g. after "Hey Meta, start Vesper".
+    func wake() {
+        if session == nil { showWelcomeIfPossible() } else if !wantsCamera { lens.showWelcome(line: welcomeLine()) }
+    }
+
     private func showWelcomeIfPossible() {
-        guard isRegistered, hasDisplayDevice, session == nil, lensEnabled() else { return }
-        wantsLens = true
-        lens.showWelcome()
+        guard isRegistered, hasDisplayDevice, session == nil, lensEnabled() || voiceEnabled() else { return }
+        wantsLens = lensEnabled()
+        if wantsLens { lens.showWelcome(line: welcomeLine()) }
         openSession(displayOnly: true)
     }
 
@@ -223,6 +253,7 @@ final class GlassesManager {
         // The lens doesn't depend on the camera, so bring it up first: a camera problem
         // must not leave the driver without speed and revs.
         if wantsLens { lens.attach(to: session) }
+        if voiceEnabled() { attachSpeech(to: session) }
         if !wantsCamera { link = .ready }
         guard wantsCamera, camera == nil else { return }
         let config = StreamConfiguration(videoCodec: VideoCodec.hvc1, resolution: StreamingResolution.high, frameRate: 30)
@@ -268,9 +299,131 @@ final class GlassesManager {
 
     func stop() {
         lens.detach()
+        speech?.stop()
         camera?.stop()
         session?.stop()
         cleanUp()
+        // Back to the welcome (and listening) once the finish card has had its moment.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            self?.showWelcomeIfPossible()
+        }
+    }
+
+    // MARK: Voice
+
+    /// Turns voice on: asks Meta AI for the glasses' microphone if needed, then starts listening.
+    func enableVoice() async {
+        do {
+            if try await wearables.checkPermissionStatus(.microphone) != .granted {
+                guard try await wearables.requestPermission(.microphone) == .granted else {
+                    needsMicrophone = true
+                    voiceStatus = "Microphone not allowed in Meta AI"
+                    return
+                }
+            }
+            needsMicrophone = false
+        } catch {
+            voiceStatus = "Glasses: \(error.localizedDescription)"
+            return
+        }
+        listenForHeyMeta()
+        if let session, sessionIsStarted { attachSpeech(to: session) } else { showWelcomeIfPossible() }
+    }
+
+    func disableVoice() {
+        speech?.stop()
+        try? session?.removeSpeech()
+        speech = nil
+        speechTokens.clear()
+        invocations?.stop()
+        invocationDevice = nil
+        voiceStatus = "Off"
+    }
+
+    /// "Hey Meta, start Vesper" arrives here. It needs no session or microphone, only
+    /// Voice Invocation switched on for Vesper in Meta's Wearables Developer Center.
+    private func listenForHeyMeta() {
+        guard voiceEnabled(), isRegistered, let id = activeDeviceID, id != invocationDevice else { return }
+        do {
+            if invocations == nil {
+                let stream = try VoiceInvocationsStream(wearables: wearables)
+                stream.invocationsPublisher.listen { [weak self] invocation in
+                    // Meta AI waits for an answer to every invocation; answer each exactly once.
+                    guard let launch = invocation as? LaunchApp else { return }
+                    Task {
+                        _ = await launch.responseHandle.sendSuccess(actionOutput: nil)
+                        await MainActor.run { self?.onVoiceLaunch?() }
+                    }
+                }.store(in: invocationTokens)
+                stream.errorPublisher.listen { error in
+                    print("Hey Meta: \(error)")
+                }.store(in: invocationTokens)
+                invocations = stream
+            }
+            try invocations?.start(deviceIdentifier: id)
+            invocationDevice = id
+        } catch {
+            print("Hey Meta unavailable: \(error)")
+        }
+    }
+
+    /// On-device speech recognition through the glasses' microphone, for "Vesper, …" commands.
+    private func attachSpeech(to session: DeviceSession) {
+        guard speech == nil else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            let granted = (try? await self.wearables.checkPermissionStatus(.microphone)) == .granted
+            guard granted else {
+                self.needsMicrophone = true
+                self.voiceStatus = "Allow the glasses microphone"
+                return
+            }
+            self.needsMicrophone = false
+            // The session may have ended while we asked.
+            guard self.sessionIsStarted, self.session != nil, self.speech == nil, self.voiceEnabled() else { return }
+            do {
+                guard let speech = try session.addSpeech() else {
+                    self.voiceStatus = "These glasses can't take voice commands"
+                    return
+                }
+                self.speech = speech
+                self.speechHasStarted = false
+                speech.transcriptionPublisher.listen { [weak self] result in
+                    guard result.isFinal else { return }
+                    let text = result.text
+                    Task { @MainActor in self?.onHeard?(text) }
+                }.store(in: self.speechTokens)
+                speech.statePublisher.listen { [weak self] state in
+                    Task { @MainActor in self?.speechStateChanged(state) }
+                }.store(in: self.speechTokens)
+                speech.errorPublisher.listen { error in
+                    print("Speech: \(error)")
+                }.store(in: self.speechTokens)
+                speech.start()
+            } catch {
+                self.voiceStatus = "Voice: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func speechStateChanged(_ state: SpeechState) {
+        switch state {
+        case .started:
+            speechHasStarted = true
+            voiceStatus = "Listening for \u{201C}Vesper\u{201D}"
+        case .stopped:
+            // Stopped is also the state it starts in; only restart one that was listening.
+            guard speechHasStarted, speech != nil else { break }
+            voiceStatus = "Voice paused"
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1))
+                guard let current = self?.speech, current.state == .stopped else { return }
+                current.start()
+            }
+        default:
+            break
+        }
     }
 
     private func cleanUp() {
@@ -280,6 +433,10 @@ final class GlassesManager {
         errorTask?.cancel()
         errorTask = nil
         lens.detach()
+        speechTokens.clear()
+        speech = nil
+        speechHasStarted = false
+        if voiceEnabled() { voiceStatus = "Paused until the glasses reconnect" }
         sessionIsStarted = false
         wantsCamera = false
         camera = nil

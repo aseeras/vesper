@@ -14,6 +14,8 @@ final class Announcer {
             ?? AVSpeechSynthesisVoice(language: "en-GB")
     }()
 
+    var isSpeaking: Bool { synth.isSpeaking }
+
     func say(_ text: String) {
         guard enabled else { return }
         let u = AVSpeechUtterance(string: text)

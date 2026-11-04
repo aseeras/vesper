@@ -81,6 +81,20 @@ struct SettingsView: View {
                 } header: { Text("Your logo and soundtrack") } footer: {
                     Text("Shown in the title sequence and corner of every film. Use a PNG with a transparent background. Music must be a file you own, not an Apple Music stream.")
                 }
+                Section {
+                    Toggle("Voice commands", isOn: $s.voiceCommands)
+                        .onChange(of: s.voiceCommands) { _, on in
+                            if on { Task { await glasses.enableVoice() } } else { glasses.disableVoice() }
+                        }
+                    if s.voiceCommands {
+                        LabeledContent("Status", value: glasses.voiceStatus)
+                        if glasses.needsMicrophone {
+                            Button("Allow the glasses microphone") { Task { await glasses.enableVoice() } }
+                        }
+                    }
+                } header: { Text("Hey Meta") } footer: {
+                    Text("Say \u{201C}Hey Meta, start Vesper\u{201D} to open Vesper, then talk to it by name: \u{201C}Vesper, track day\u{201D}, \u{201C}Vesper, grand tour\u{201D}, \u{201C}Vesper, end mission\u{201D}, \u{201C}Vesper, stand down\u{201D}, \u{201C}Vesper, next car\u{201D}, or a car\u{2019}s name such as \u{201C}Vesper, DB9\u{201D}. Anything said without \u{201C}Vesper\u{201D} is ignored, so the radio and passengers can\u{2019}t set it off.")
+                }
                 Section("Glasses") {
                     LabeledContent("Status", value: glasses.link.label)
                     if glasses.isRegistered {

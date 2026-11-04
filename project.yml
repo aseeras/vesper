@@ -32,6 +32,8 @@ targets:
         product: MWDATCamera
       - package: MetaWearables
         product: MWDATDisplay
+      - package: MetaWearables
+        product: MWDATSpeech
       - sdk: CarPlay.framework
     settings:
       base:
