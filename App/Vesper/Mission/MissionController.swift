@@ -39,6 +39,8 @@ final class MissionController {
     private var auto = AutoRecordController()
     private var lapTimer: LiveLapTimer?
     private var mission: Mission?
+    /// The garage car this drive is in.
+    var carName: String? { mission?.car }
     private var startUptime: TimeInterval = 0
     private var clock: Timer?
     private let frameGate = FrameGate()
