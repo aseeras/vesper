@@ -105,15 +105,20 @@ final class LensHUDTests: XCTestCase {
         XCTAssertFalse(slower.positive)
     }
 
-    func testLiveGaugesRoundSoTheLensRefreshesSparingly() {
-        let a = LensHUD.live(speed: 50, rpm: 5_812, unit: .mph, lap: 3, best: Lap(number: 2, start: 0, end: 102.381, topSpeed: 60))
+    func testLiveGaugesShowSpeedWithoutRevs() {
+        let best = Lap(number: 2, start: 0, end: 102.381, topSpeed: 60)
+        let a = LensHUD.live(speed: 50, unit: .mph, lap: 3, best: best)
         XCTAssertEqual(a.headline, "112 MPH")
-        XCTAssertEqual(a.footnote, "LAP 3 · BEST 1:42.381")
-        XCTAssertTrue(a.detail?.hasSuffix("RPM") ?? false)
-        XCTAssertTrue(a.detail?.contains("800") ?? false)
-        // A wobble of a few rpm and a fraction of a mph produces the identical layout.
-        let b = LensHUD.live(speed: 50.05, rpm: 5_790, unit: .mph, lap: 3, best: Lap(number: 2, start: 0, end: 102.381, topSpeed: 60))
-        XCTAssertEqual(a, b)
-        XCTAssertEqual(LensHUD.live(speed: 0, rpm: nil, unit: .kmh, lap: 0, best: nil).detail, "— RPM")
+        XCTAssertEqual(a.detail, "LAP 3")
+        XCTAssertEqual(a.footnote, "BEST 1:42.381")
+        // A fraction of a mph produces the identical layout, so the lens doesn't refresh.
+        XCTAssertEqual(a, LensHUD.live(speed: 50.05, unit: .mph, lap: 3, best: best))
+        let out = LensHUD.live(speed: 0, unit: .kmh, lap: 0, best: nil)
+        XCTAssertEqual(out.headline, "0 KM/H")
+        XCTAssertEqual(out.detail, "OUT LAP")
+        XCTAssertNil(out.footnote)
+        for hud in [a, out, LensHUD.liveRoad(speed: 20, unit: .mph, distance: 5_000, elapsed: 600)] {
+            XCTAssertFalse([hud.headline, hud.detail ?? "", hud.footnote ?? ""].joined().contains("RPM"))
+        }
     }
 }
