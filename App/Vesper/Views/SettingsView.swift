@@ -57,9 +57,10 @@ struct SettingsView: View {
                     Toggle("Spoken call-outs", isOn: $s.voiceCallouts)
                     Toggle("Lens display (Ray-Ban Display)", isOn: $s.lensDisplay)
                     Toggle("Speedometer in grand tour films", isOn: $s.showSpeedOnRoad)
+                    Toggle("Speed & red-light camera alerts", isOn: $s.cameraAlerts)
                     Stepper(String(format: "Glasses delay %.2f s", s.glassesLatency), value: $s.glassesLatency, in: 0...1, step: 0.05)
                 } header: { Text("Hands-free") } footer: {
-                    Text("If the gauges in your film run ahead of the picture, raise the glasses delay.")
+                    Text("If the gauges in your film run ahead of the picture, raise the glasses delay. Camera locations © OpenStreetMap contributors; coverage depends on what's been mapped locally, so always watch the posted limits.")
                 }
                 Section {
                     PhotosPicker(selection: $logoItem, matching: .images) {

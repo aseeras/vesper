@@ -60,3 +60,12 @@ extension LensHUD {
                 footnote: Format.duration(elapsed))
     }
 }
+
+extension LensHUD {
+    /// Camera warning: what it is, how far ahead, and the limit when known.
+    public static func camera(_ alert: CameraAlerter.Alert, unit: SpeedUnit) -> LensHUD {
+        let what = alert.camera.kind == .speed ? "SPEED CAMERA" : "RED-LIGHT CAMERA"
+        return LensHUD(headline: what, detail: "\(Format.shortDistance(alert.distance, unit)) AHEAD",
+                       footnote: alert.camera.limit.map { "LIMIT \(Format.speed($0, unit))" })
+    }
+}
