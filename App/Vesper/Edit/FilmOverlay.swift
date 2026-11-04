@@ -11,6 +11,8 @@ struct FilmOverlay: @unchecked Sendable {
     struct Style {
         var callsign: String
         var car: String
+        /// "V12", "V8"… shown next to the car's name.
+        var engine = "V12"
         var codename: String
         var trackName: String
         var date: Date
@@ -220,7 +222,7 @@ struct FilmOverlay: @unchecked Sendable {
             logo.draw(in: CGRect(x: w * 0.05, y: h * 0.04, width: width, height: height), blendMode: .normal, alpha: 0.9)
         } else {
             text("VESPER", at: CGPoint(x: w * 0.05, y: h * 0.045), size: w * 0.032, color: gold, kern: 8)
-            text(style.car.uppercased() + " · V12", at: CGPoint(x: w * 0.05, y: h * 0.07), size: w * 0.022, color: silver, kern: 3)
+            text(style.car.uppercased() + " · " + style.engine, at: CGPoint(x: w * 0.05, y: h * 0.07), size: w * 0.022, color: silver, kern: 3)
         }
     }
 
