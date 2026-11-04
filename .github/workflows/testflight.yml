@@ -84,8 +84,17 @@ jobs:
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
           KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          # Optional: Vesper's app in Meta's Wearables Developer Center. Without them the
+          # app runs in the glasses' Developer Mode.
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_CLIENT_TOKEN: ${{ secrets.META_CLIENT_TOKEN }}
         run: |
           set -o pipefail
+          META=()
+          if [ -n "$META_APP_ID" ] && [ -n "$META_CLIENT_TOKEN" ]; then
+            META=(META_APP_ID="$META_APP_ID" CLIENT_TOKEN="$META_CLIENT_TOKEN")
+            echo "Using Vesper's Meta app ID"
+          fi
           if ! xcodebuild archive \
               -project Vesper.xcodeproj -scheme Vesper -configuration Release \
               -destination 'generic/platform=iOS' \
@@ -94,7 +103,7 @@ jobs:
               -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
               -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER" \
               DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
-              CURRENT_PROJECT_VERSION="${{ github.run_number }}" > archive.log 2>&1; then
+              CURRENT_PROJECT_VERSION="${{ github.run_number }}" "${META[@]}" > archive.log 2>&1; then
             grep -E "error:" archive.log | sort -u | head -60
             tail -40 archive.log
             exit 1
