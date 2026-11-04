@@ -47,6 +47,8 @@ final class DriverSettings {
     var lastMode: DriveMode { didSet { d.set(lastMode.rawValue, forKey: "lastMode") } }
     /// Grand tour films can leave the speedometer out.
     var showSpeedOnRoad: Bool { didSet { d.set(showSpeedOnRoad, forKey: "showSpeedOnRoad") } }
+    /// Warn about speed and red-light cameras ahead, on the lens and by voice.
+    var cameraAlerts: Bool { didSet { d.set(cameraAlerts, forKey: "cameraAlerts") } }
 
     init() {
         callsign = d.string(forKey: "callsign") ?? "ALVIN"
@@ -68,6 +70,7 @@ final class DriverSettings {
         lensDisplay = d.object(forKey: "lensDisplay") as? Bool ?? true
         lastMode = DriveMode(rawValue: d.string(forKey: "lastMode") ?? "") ?? .track
         showSpeedOnRoad = d.object(forKey: "showSpeedOnRoad") as? Bool ?? true
+        cameraAlerts = d.object(forKey: "cameraAlerts") as? Bool ?? true
         // didSet doesn't run during init: store the migrated garage so its ids stay stable.
         if garage.isEmpty {
             saveGarage()

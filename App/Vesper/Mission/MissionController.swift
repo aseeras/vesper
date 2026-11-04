@@ -49,6 +49,7 @@ final class MissionController {
         set { frameGate.isOpen = newValue }
     }
     private var fixesSinceRolling: [GPSFix] = []
+    private let cameraWatch = CameraWatch()
 
     init(glasses: GlassesManager, store: MissionStore, settings: DriverSettings) {
         self.glasses = glasses
@@ -140,6 +141,10 @@ final class MissionController {
     private func handle(_ fix: GPSFix) {
         speed = max(0, fix.speed)
         refreshLens()
+        if settings.cameraAlerts, phase == .armed || phase == .rolling, let alert = cameraWatch.update(fix: fix) {
+            glasses.lens.show(.camera(alert, unit: settings.unit), hold: 5)
+            announcer.say(alert.camera.kind == .speed ? "Speed camera ahead." : "Red light camera ahead.")
+        }
         if let e = auto.update(speed: speed, at: fix.t) { react(to: e) }
         guard phase == .rolling else { return }
         if rollingSince == nil { rollingSince = fix.t }

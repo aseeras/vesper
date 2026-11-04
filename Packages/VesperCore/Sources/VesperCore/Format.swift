@@ -34,6 +34,15 @@ public enum Format {
         unit == .mph ? String(format: "%.1f MI", metres / 1609.344) : String(format: "%.1f KM", metres / 1000)
     }
 
+    /// Short warning distances: "1,000 FT" (rounded to 100 ft) or "300 M" (rounded to 50 m).
+    public static func shortDistance(_ metres: Double, _ unit: SpeedUnit) -> String {
+        if unit == .mph {
+            let feet = max(100, (metres * 3.28084 / 100).rounded() * 100)
+            return "\(Int(feet).formatted(.number.grouping(.automatic))) FT"
+        }
+        return "\(Int(max(50, (metres / 50).rounded() * 50))) M"
+    }
+
     /// "1H 24M" or "38M".
     public static func duration(_ seconds: Double) -> String {
         let m = Int(seconds / 60)
