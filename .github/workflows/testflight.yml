@@ -50,6 +50,35 @@ jobs:
           mkdir -p "$RUNNER_TEMP/asc"
           printf '%s\n' "$P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
 
+      # Each fresh runner makes a throwaway "Created via API" development certificate when it
+      # signs. Apple caps them, so remove the ones earlier builds left behind. Certificates
+      # made any other way (e.g. in Xcode on a Mac, with a person's name) are never touched.
+      - name: Remove old CI signing certificates
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          pip3 install --quiet --break-system-packages pyjwt cryptography requests 2>/dev/null \
+            || pip3 install --quiet pyjwt cryptography requests
+          python3 - <<'PY'
+          import os, time, jwt, requests
+          key = open(os.path.join(os.environ["RUNNER_TEMP"], "asc", "AuthKey.p8")).read()
+          now = int(time.time())
+          token = jwt.encode({"iss": os.environ["ISSUER"], "iat": now, "exp": now + 1200, "aud": "appstoreconnect-v1"},
+                             key, algorithm="ES256", headers={"kid": os.environ["KEY_ID"], "typ": "JWT"})
+          H = {"Authorization": f"Bearer {token}"}
+          API = "https://api.appstoreconnect.apple.com/v1/certificates"
+          r = requests.get(API, headers=H, params={"limit": 200}, timeout=60); r.raise_for_status()
+          for c in r.json()["data"]:
+              a = c["attributes"]
+              name = f'{a.get("name", "")} {a.get("displayName", "")}'
+              if a.get("certificateType") in ("DEVELOPMENT", "IOS_DEVELOPMENT") and "Created via API" in name:
+                  d = requests.delete(f"{API}/{c['id']}", headers=H, timeout=60)
+                  print(f"revoke {a.get('displayName') or a.get('name')} ({a.get('serialNumber')}): {d.status_code}")
+              else:
+                  print(f"keep   {a.get('certificateType')} {name.strip()}")
+          PY
+
       - name: Archive
         env:
           TEAM: ${{ secrets.APPLE_TEAM_ID }}

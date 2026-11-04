@@ -84,10 +84,10 @@ Internal TestFlight builds skip Apple's beta review, which matters because Meta'
 
 ### CarPlay
 
-CarPlay needs Apple's **CarPlay Driving Task** entitlement. Request it at
-<https://developer.apple.com/contact/carplay>. Once it's granted, set
-`VESPER_ENTITLEMENTS = App/Vesper/Resources/Vesper-CarPlay.entitlements` in `Secrets.xcconfig` and rebuild.
-Until then the app works normally without the CarPlay screen.
+CarPlay uses Apple's **CarPlay Driving Task** entitlement, which has been granted for this
+team, so `Config/Base.xcconfig` points `VESPER_ENTITLEMENTS` at
+`App/Vesper/Resources/Vesper-CarPlay.entitlements`. To build on a team without it, set
+`VESPER_ENTITLEMENTS = App/Vesper/Resources/Vesper.entitlements` in `Secrets.xcconfig`.
 
 ## Tuning
 
