@@ -9,6 +9,7 @@ import VesperCore
 @MainActor
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private var interfaceController: CPInterfaceController?
+    private weak var scene: CPTemplateApplicationScene?
     private var template: CPInformationTemplate?
     private var refresh: Timer?
 
@@ -17,7 +18,11 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     func templateApplicationScene(_ scene: CPTemplateApplicationScene,
                                   didConnect interfaceController: CPInterfaceController) {
         self.interfaceController = interfaceController
+        self.scene = scene
         let t = CPInformationTemplate(title: "Vesper", layout: .twoColumn, items: [], actions: [])
+        // Always-available jump to the driver's maps app on the car screen. The bottom row is
+        // full (Track day, Grand tour, Next car), so this lives in the navigation bar.
+        t.trailingNavigationBarButtons = [CPBarButton(title: "Maps") { [weak self] _ in self?.openMaps() }]
         template = t
         update()
         interfaceController.setRootTemplate(t, animated: false, completion: nil)
@@ -32,6 +37,14 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         refresh = nil
         template = nil
         self.interfaceController = nil
+    }
+
+    /// Opens Google Maps on the car screen, or Apple Maps if Google Maps isn't installed.
+    private func openMaps() {
+        guard let scene else { return }
+        scene.open(URL(string: "comgooglemaps://")!, options: nil) { opened in
+            if !opened { scene.open(URL(string: "maps://")!, options: nil, completionHandler: nil) }
+        }
     }
 
     private func update() {
