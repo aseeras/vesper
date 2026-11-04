@@ -66,6 +66,10 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                     })
                 }
             case .rolling:
+                // Recording indicator first, so it's the most prominent line on the car screen.
+                let rec = m.recordedDuration.map { "● REC  " + Format.clock($0) } ?? "● REC"
+                let camera = model.glasses.link == .streaming ? "Glasses camera live" : "Check glasses: " + model.glasses.link.label
+                items.append(CPInformationItem(title: rec, detail: camera))
                 if m.mode == .road {
                     items.append(CPInformationItem(title: car, detail: Format.speed(m.speed, unit)))
                     items.append(CPInformationItem(title: "Trip", detail: Format.distance(m.tripDistance, unit)))

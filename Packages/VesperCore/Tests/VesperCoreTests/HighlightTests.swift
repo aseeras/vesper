@@ -88,5 +88,7 @@ final class HighlightTests: XCTestCase {
         XCTAssertEqual(TelemetryTrack(fixes: fixes).distance, 2 * .pi * 200, accuracy: 5)
         XCTAssertEqual(Format.distance(1609.344 * 42.3, .mph), "42.3 MI")
         XCTAssertEqual(Format.duration(84 * 60), "1H 24M")
+        XCTAssertEqual(Format.clock(247.9), "4:07")
+        XCTAssertEqual(Format.clock(3729), "1:02:09")
     }
 }
