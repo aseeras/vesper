@@ -44,6 +44,13 @@ public enum Format {
     }
 
     /// "1H 24M" or "38M".
+    /// "4:07" or "1:02:09": a running clock for elapsed recording time.
+    public static func clock(_ seconds: Double) -> String {
+        let s = Int(max(0, seconds))
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60)
+                         : String(format: "%d:%02d", s / 60, s % 60)
+    }
+
     public static func duration(_ seconds: Double) -> String {
         let m = Int(seconds / 60)
         return m >= 60 ? "\(m / 60)H \(m % 60)M" : "\(m)M"

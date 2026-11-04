@@ -27,6 +27,8 @@ final class MissionController {
     /// Grand tour trip meter, metres.
     private(set) var tripDistance: Double = 0
     private(set) var rollingSince: Double?
+    /// Mission time when video recording began, for the recording timer on CarPlay.
+    private(set) var recordingStartedAt: Double?
     private var lastFix: GPSFix?
 
     let glasses: GlassesManager
@@ -41,6 +43,9 @@ final class MissionController {
     private var mission: Mission?
     /// The garage car this drive is in.
     var carName: String? { mission?.car }
+
+    /// Seconds of footage captured so far, or nil before recording starts.
+    var recordedDuration: Double? { recordingStartedAt.map { max(0, missionTime - $0) } }
     private var startUptime: TimeInterval = 0
     private var clock: Timer?
     private let frameGate = FrameGate()
@@ -64,7 +69,7 @@ final class MissionController {
         guard phase == .idle else { return }
         error = nil
         self.mode = mode
-        tripDistance = 0; rollingSince = nil; lastFix = nil
+        tripDistance = 0; rollingSince = nil; recordingStartedAt = nil; lastFix = nil
         announcer.enabled = settings.voiceCallouts
         startUptime = ProcessInfo.processInfo.systemUptime
         mission = Mission(codename: Format.codename(for: .now), trackName: trackName.isEmpty ? (mode == .road ? "Open road" : "Unnamed circuit") : trackName,
@@ -189,6 +194,7 @@ final class MissionController {
             guard let mission else { return }
             recorder.start(url: MissionStore.videoURL(mission.id))
             recordingFrames = true
+            recordingStartedAt = missionTime
             glasses.setPreview(enabled: false)
             try? engineAudio?.startRecording(to: MissionStore.audioURL(mission.id))
             phase = .rolling
