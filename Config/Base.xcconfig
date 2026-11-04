@@ -5,8 +5,8 @@
 META_APP_ID = 0
 CLIENT_TOKEN = 0
 
-// Switch to App/Vesper/Resources/Vesper-CarPlay.entitlements once Apple grants
-// the CarPlay Driving Task entitlement.
-VESPER_ENTITLEMENTS = App/Vesper/Resources/Vesper.entitlements
+// Apple granted the CarPlay Driving Task entitlement (2026-11-04). The plain
+// Vesper.entitlements file is kept for builds on a team without it.
+VESPER_ENTITLEMENTS = App/Vesper/Resources/Vesper-CarPlay.entitlements
 
 #include? "Secrets.xcconfig"
