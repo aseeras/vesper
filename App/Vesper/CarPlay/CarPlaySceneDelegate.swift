@@ -41,9 +41,11 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         var actions: [CPTextButton] = []
 
         if let m = model.activeMission {
+            let car = m.carName ?? model.settings.car
             switch m.phase {
             case .idle, .armed:
                 items.append(CPInformationItem(title: "Status", detail: "Armed. Recording starts when you drive."))
+                items.append(CPInformationItem(title: "Car", detail: car))
                 items.append(CPInformationItem(title: "Glasses", detail: model.glasses.link.label))
                 if m.isStationary {
                     actions.append(CPTextButton(title: "Stand down", textStyle: .cancel) { [weak self] _ in
@@ -52,10 +54,10 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 }
             case .rolling:
                 if m.mode == .road {
-                    items.append(CPInformationItem(title: "Grand tour", detail: Format.speed(m.speed, unit)))
+                    items.append(CPInformationItem(title: car, detail: Format.speed(m.speed, unit)))
                     items.append(CPInformationItem(title: "Trip", detail: Format.distance(m.tripDistance, unit)))
                 } else {
-                    items.append(CPInformationItem(title: m.lapCount > 0 ? "Lap \(m.lapCount + 1)" : "Out lap",
+                    items.append(CPInformationItem(title: (m.lapCount > 0 ? "Lap \(m.lapCount + 1)" : "Out lap") + " · " + car,
                                                    detail: Format.speed(m.speed, unit)))
                 }
                 if let last = m.lastLap { items.append(CPInformationItem(title: "Last lap", detail: Format.lapTime(last.duration))) }
@@ -67,12 +69,15 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 items.append(CPInformationItem(title: "Status", detail: "Saving footage…"))
             case .done(let id):
                 items.append(CPInformationItem(title: "Mission complete", detail: "Debrief ready on your phone"))
+                items.append(CPInformationItem(title: "Car", detail: car))
                 if let best = m.bestLap { items.append(CPInformationItem(title: "Best lap", detail: Format.lapTime(best.duration))) }
                 actions.append(CPTextButton(title: "Done", textStyle: .confirm) { [weak self] _ in
                     self?.model.close(finished: id); self?.update()
                 })
             }
         } else {
+            let settings = model.settings
+            items.append(CPInformationItem(title: "Car", detail: settings.car))
             items.append(CPInformationItem(title: "Glasses", detail: model.glasses.link.label))
             if let last = model.store.missions.first {
                 items.append(CPInformationItem(title: "Last mission", detail: last.trackName))
@@ -84,6 +89,15 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             actions.append(CPTextButton(title: "Grand tour", textStyle: .normal) { [weak self] _ in
                 Task { await self?.model.arm(trackName: "", mode: .road); self?.update() }
             })
+            // Only shown with no drive running, i.e. before setting off.
+            if settings.cars.count > 1 {
+                actions.append(CPTextButton(title: "Next car", textStyle: .normal) { [weak self] _ in
+                    let cars = settings.cars
+                    let i = cars.firstIndex { $0.id == settings.activeCarID } ?? 0
+                    settings.activeCarID = cars[(i + 1) % cars.count].id
+                    self?.update()
+                })
+            }
         }
         template.items = items
         template.actions = actions
