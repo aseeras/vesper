@@ -4,6 +4,7 @@ import SwiftUI
 struct VesperApp: App {
     @State private var model: AppModel
     @State private var showIntro = true
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // The Meta toolkit must be configured before anything touches Wearables.shared,
@@ -34,6 +35,13 @@ struct VesperApp: App {
             .task { await model.glasses.observeActiveDevice() }
             .task { await model.glasses.observeActiveDisplayDevice() }
             .onOpenURL { url in Task { await model.glasses.handle(url: url) } }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                switch phase {
+                case .active: model.glasses.appBecameActive()
+                case .background: model.glasses.appWentToBackground(driveInProgress: model.activeMission != nil)
+                default: break
+                }
+            }
         }
     }
 }

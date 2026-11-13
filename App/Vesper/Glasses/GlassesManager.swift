@@ -65,6 +65,10 @@ final class GlassesManager {
     /// Whether to light up the lens (racetrack welcome, live gauges). Set by AppModel from settings.
     @ObservationIgnored var lensEnabled: () -> Bool = { true }
     @ObservationIgnored nonisolated(unsafe) private var previewEnabled = true
+    /// Whether Vesper is on screen on the phone. Vesper only puts itself on the glasses
+    /// while it's open (or when asked: the Lens button, "Hey Meta", arming a drive), so it
+    /// never takes over the lens just because the glasses connected.
+    @ObservationIgnored private var appIsActive = false
 
     // MARK: Voice
     /// Whether "Hey Meta" and spoken commands are on. Set by AppModel from settings.
@@ -121,12 +125,29 @@ final class GlassesManager {
         }
     }
 
-    /// Whether Ray-Ban Display glasses are selectable; the welcome goes up when they appear.
+    /// Whether Ray-Ban Display glasses are selectable; the welcome goes up when they appear,
+    /// but only while Vesper is open on the phone.
     func observeActiveDisplayDevice() async {
         for await id in displaySelector.activeDeviceStream() {
             hasDisplayDevice = id != nil
-            showWelcomeIfPossible()
+            if appIsActive { showWelcomeIfPossible() }
         }
+    }
+
+    /// Vesper was opened on the phone: put the welcome on the lens.
+    func appBecameActive() {
+        appIsActive = true
+        showWelcomeIfPossible()
+    }
+
+    /// Vesper left the screen: hand the glasses back unless a drive is using them.
+    func appWentToBackground(driveInProgress: Bool) {
+        appIsActive = false
+        guard !driveInProgress, !wantsCamera, session != nil else { return }
+        lens.detach()
+        speech?.stop()
+        session?.stop()
+        cleanUp()
     }
 
     private func apply(_ state: RegistrationState) {
@@ -134,7 +155,7 @@ final class GlassesManager {
         case .registered:
             isRegistered = true
             if session == nil { link = hasDevice ? .ready : .waitingForGlasses }
-            showWelcomeIfPossible()
+            if appIsActive { showWelcomeIfPossible() }
             listenForHeyMeta()
         case .registering:
             link = .registering
@@ -303,10 +324,12 @@ final class GlassesManager {
         camera?.stop()
         session?.stop()
         cleanUp()
-        // Back to the welcome (and listening) once the finish card has had its moment.
+        // Back to the welcome (and listening) once the finish card has had its moment,
+        // if Vesper is still open on the phone; otherwise the glasses go back to normal.
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(6))
-            self?.showWelcomeIfPossible()
+            guard let self, self.appIsActive else { return }
+            self.showWelcomeIfPossible()
         }
     }
 
