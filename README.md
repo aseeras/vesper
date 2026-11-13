@@ -69,6 +69,10 @@ paid for longer), and your glasses set up in the Meta AI app.
 4. Plug in your iPhone, pick it as the run destination and press Run.
 5. In Vesper, tap **Pair**. The Meta AI app opens to approve the connection.
 
+### When Vesper shows on the glasses
+
+Vesper isn't the glasses' default app. It only puts itself on the lens while it's open on your iPhone, when you tap **Lens**, or when a drive is armed. Put it in the background and the glasses go back to normal; turning the glasses on doesn't bring Vesper up on its own.
+
 ### Hey Meta and voice commands
 
 "Hey Meta, start Vesper" opens Vesper, then you talk to Vesper by name through the glasses' microphone: "Vesper, track day", "Vesper, grand tour", "Vesper, end mission", "Vesper, stand down", "Vesper, next car" or "Vesper, DB9". Phrases without "Vesper" are ignored. Both features are experimental in Meta's toolkit, so they're only for development and TestFlight builds. To turn them on:
